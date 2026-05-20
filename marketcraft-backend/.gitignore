@@ -1,0 +1,12 @@
+# ── Secrets (NE JAMAIS VERSIONNER) ───────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Dépendances Composer ──────────────────────────────────────────────────────
+vendor/
+
+# ── Logs & cache ──────────────────────────────────────────────────────────────
+*.log
+storage/logs/
+cache/

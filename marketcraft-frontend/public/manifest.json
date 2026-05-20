@@ -1,0 +1,52 @@
+{
+  "name": "MarketCraft",
+  "short_name": "MarketCraft",
+  "description": "La marketplace des artisans du monde. Découvrez des créations uniques faites à la main.",
+  "theme_color": "#8B4513",
+  "background_color": "#FFF8F0",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait-primary",
+  "categories": ["shopping", "marketplace"],
+  "icons": [
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Produits",
+      "short_name": "Produits",
+      "description": "Parcourir les produits artisanaux",
+      "url": "/produits",
+      "icons": [
+        {
+          "src": "logo192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Boutiques",
+      "short_name": "Boutiques",
+      "description": "Découvrir les boutiques d'artisans",
+      "url": "/boutiques",
+      "icons": [
+        {
+          "src": "logo192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

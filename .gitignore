@@ -1,0 +1,38 @@
+# ── Secrets & environnement (JAMAIS versionner) ──────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Node / React ──────────────────────────────────────────────────────────────
+node_modules/
+frontend-web/node_modules/
+marketcraft-frontend/node_modules/
+frontend-web/build/
+marketcraft-frontend/build/
+marketcraft-frontend/.cache/
+
+# ── PHP / Composer ────────────────────────────────────────────────────────────
+vendor/
+BlougeCorp-backend/vendor/
+marketcraft-backend/vendor/
+
+# ── Logs & temporaires ────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.swp
+
+# ── IDEs & OS ─────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Archives ──────────────────────────────────────────────────────────────────
+*.zip
+*.tar
+*.gz
+*.rar
+*.exe

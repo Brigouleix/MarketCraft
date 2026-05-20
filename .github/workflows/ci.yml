@@ -1,0 +1,96 @@
+name: MarketCraft CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend PHP ────────────────────────────────────────────────────────────
+  backend:
+    name: PHP Syntax & Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, mbstring, json
+          coverage: none
+
+      - name: Validate composer.json
+        working-directory: marketcraft-backend
+        run: composer validate --strict
+
+      - name: Install Composer dependencies
+        working-directory: marketcraft-backend
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Check PHP syntax (recursive)
+        working-directory: marketcraft-backend
+        run: find . -name "*.php" -not -path "*/vendor/*" | xargs -I{} php -l {}
+
+      - name: Run PHPStan (level 5)
+        working-directory: marketcraft-backend
+        run: |
+          if [ -f vendor/bin/phpstan ]; then
+            vendor/bin/phpstan analyse app --level=5 --no-progress
+          else
+            echo "PHPStan non installé, étape ignorée."
+          fi
+
+  # ── Frontend React ─────────────────────────────────────────────────────────
+  frontend:
+    name: React Build & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: marketcraft-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: marketcraft-frontend
+        run: npm ci
+
+      - name: Lint (ESLint)
+        working-directory: marketcraft-frontend
+        run: npm run lint --if-present
+
+      - name: Build production bundle
+        working-directory: marketcraft-frontend
+        env:
+          CI: false
+          REACT_APP_API_URL: http://localhost:8000/api
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketcraft-frontend-build
+          path: marketcraft-frontend/build/
+          retention-days: 7
+
+  # ── Security scan ──────────────────────────────────────────────────────────
+  security:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for exposed secrets
+        run: |
+          if grep -rn "ANTHROPIC_API_KEY\|DB_PASSWORD\|JWT_SECRET" --include="*.php" --include="*.js" --include="*.jsx" --exclude-dir=node_modules --exclude-dir=vendor .; then
+            echo "⚠️  Secrets potentiels détectés dans le code source !"
+            exit 1
+          else
+            echo "✅ Aucun secret détecté."
+          fi

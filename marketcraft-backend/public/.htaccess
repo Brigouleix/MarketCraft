@@ -1,0 +1,21 @@
+Options -MultiViews -Indexes
+
+RewriteEngine On
+
+# Sécurité : bloquer l'accès aux fichiers sensibles
+RewriteRule ^\.env$             - [F,L]
+RewriteRule ^composer\.(json|lock)$ - [F,L]
+
+# Autoriser les fichiers et dossiers existants (images, assets…)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Tout le reste vers index.php
+RewriteRule ^ index.php [QSA,L]
+
+# En-têtes de sécurité de base
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

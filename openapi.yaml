@@ -1,0 +1,514 @@
+openapi: 3.0.3
+info:
+  title: MarketCraft API
+  description: |
+    API RESTful de la marketplace artisanale MarketCraft.
+
+    ## Authentification
+    La majorité des endpoints nécessitent un token JWT passé dans le header :
+    `Authorization: Bearer <token>`
+
+    Le token est obtenu via `POST /auth/login` ou `POST /auth/register`.
+  version: 1.0.0
+  contact:
+    name: Équipe MarketCraft
+    email: dev@marketcraft.fr
+
+servers:
+  - url: http://localhost:8000/api
+    description: Serveur de développement local
+  - url: https://api.marketcraft.fr/api
+    description: Serveur de production
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string, example: "Unauthorized." }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        nom: { type: string, example: "Dupont" }
+        prenom: { type: string, example: "Marie" }
+        email: { type: string, format: email, example: "marie@example.com" }
+        role: { type: string, enum: [client, vendeur, admin] }
+        telephone: { type: string, nullable: true, example: "+33612345678" }
+        avatar_url: { type: string, nullable: true }
+        est_actif: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    Product:
+      type: object
+      properties:
+        id: { type: integer }
+        boutique_id: { type: integer }
+        nom: { type: string, example: "Table en chêne massif" }
+        description: { type: string }
+        prix: { type: number, format: float, example: 349.99 }
+        stock: { type: integer, example: 5 }
+        categorie: { type: string, example: "Mobilier" }
+        tags: { type: string, example: "bois,chêne,artisanal" }
+        images: { type: array, items: { type: string } }
+        est_actif: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    Boutique:
+      type: object
+      properties:
+        id: { type: integer }
+        vendeur_id: { type: integer }
+        nom: { type: string, example: "L'Atelier du Bois" }
+        description: { type: string }
+        logo_url: { type: string, nullable: true }
+        localisation: { type: string, example: "Lyon, France" }
+        note_moyenne: { type: number, format: float, example: 4.7 }
+        est_active: { type: boolean }
+
+    Order:
+      type: object
+      properties:
+        id: { type: integer }
+        utilisateur_id: { type: integer }
+        statut: { type: string, enum: [en_attente, confirmee, expediee, livree, annulee] }
+        total: { type: number, format: float }
+        adresse_livraison: { type: string }
+        created_at: { type: string, format: date-time }
+        lignes: { type: array, items: { $ref: '#/components/schemas/OrderLine' } }
+
+    OrderLine:
+      type: object
+      properties:
+        produit_id: { type: integer }
+        quantite: { type: integer }
+        prix_unitaire: { type: number, format: float }
+
+    Avis:
+      type: object
+      properties:
+        id: { type: integer }
+        utilisateur_id: { type: integer }
+        produit_id: { type: integer }
+        note: { type: integer, minimum: 1, maximum: 5 }
+        commentaire: { type: string }
+        created_at: { type: string, format: date-time }
+
+    SearchResult:
+      type: object
+      properties:
+        success: { type: boolean }
+        ai_message: { type: string, example: "J'ai trouvé 3 produits correspondant à votre recherche." }
+        keywords: { type: array, items: { type: string } }
+        results: { type: array, items: { $ref: '#/components/schemas/Product' } }
+        mode: { type: string, enum: [ai, fallback] }
+
+    PaginatedProducts:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Product' } }
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+        pages: { type: integer }
+
+paths:
+  # ── Auth ───────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Authentification]
+      summary: Inscription d'un nouvel utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom, prenom, email, password]
+              properties:
+                nom: { type: string, minLength: 2, maxLength: 100 }
+                prenom: { type: string, minLength: 2, maxLength: 100 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                role: { type: string, enum: [client, vendeur], default: client }
+                telephone: { type: string }
+      responses:
+        '201':
+          description: Inscription réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+        '409':
+          description: Email déjà utilisé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Erreur de validation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/login:
+    post:
+      tags: [Authentification]
+      summary: Connexion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Identifiants invalides (ou compte bloqué pour brute-force)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Trop de tentatives — compte temporairement bloqué
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/me:
+    get:
+      tags: [Authentification]
+      summary: Récupérer l'utilisateur connecté
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Non authentifié
+    put:
+      tags: [Authentification]
+      summary: Mettre à jour son profil
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom: { type: string }
+                prenom: { type: string }
+                telephone: { type: string }
+                password: { type: string, minLength: 8 }
+                current_password: { type: string }
+      responses:
+        '200':
+          description: Profil mis à jour
+        '401':
+          description: Non authentifié
+
+  # ── Products ───────────────────────────────────────────────────────────────
+  /products:
+    get:
+      tags: [Produits]
+      summary: Lister les produits (paginé)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 12 }
+        - in: query
+          name: categorie
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [recent, prix_asc, prix_desc, note] }
+      responses:
+        '200':
+          description: Liste paginée des produits
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedProducts' }
+    post:
+      tags: [Produits]
+      summary: Créer un produit (vendeur requis)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [boutique_id, nom, prix, stock]
+              properties:
+                boutique_id: { type: integer }
+                nom: { type: string }
+                description: { type: string }
+                prix: { type: number }
+                stock: { type: integer }
+                categorie: { type: string }
+                tags: { type: string }
+      responses:
+        '201': { description: Produit créé }
+        '403': { description: Accès refusé }
+
+  /products/{id}:
+    get:
+      tags: [Produits]
+      summary: Détail d'un produit
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Détail produit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404': { description: Produit non trouvé }
+    put:
+      tags: [Produits]
+      summary: Mettre à jour un produit (vendeur propriétaire)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Produit mis à jour }
+        '403': { description: Accès refusé }
+    delete:
+      tags: [Produits]
+      summary: Supprimer un produit
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Produit supprimé }
+
+  # ── Boutiques ──────────────────────────────────────────────────────────────
+  /boutiques:
+    get:
+      tags: [Boutiques]
+      summary: Lister les boutiques
+      responses:
+        '200':
+          description: Liste des boutiques
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Boutique' }
+    post:
+      tags: [Boutiques]
+      summary: Créer une boutique (vendeur)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '201': { description: Boutique créée }
+
+  /boutiques/{id}:
+    get:
+      tags: [Boutiques]
+      summary: Détail d'une boutique
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Détail boutique + produits
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Boutique' }
+
+  # ── Orders ─────────────────────────────────────────────────────────────────
+  /orders:
+    get:
+      tags: [Commandes]
+      summary: Mes commandes
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Liste des commandes de l'utilisateur
+    post:
+      tags: [Commandes]
+      summary: Passer une commande
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lignes, adresse_livraison]
+              properties:
+                lignes:
+                  type: array
+                  items: { $ref: '#/components/schemas/OrderLine' }
+                adresse_livraison: { type: string }
+      responses:
+        '201': { description: Commande créée }
+        '401': { description: Non authentifié }
+
+  /orders/{id}:
+    get:
+      tags: [Commandes]
+      summary: Détail d'une commande
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Détail commande }
+
+  # ── Avis ───────────────────────────────────────────────────────────────────
+  /avis:
+    post:
+      tags: [Avis]
+      summary: Poster un avis
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [produit_id, note]
+              properties:
+                produit_id: { type: integer }
+                note: { type: integer, minimum: 1, maximum: 5 }
+                commentaire: { type: string }
+      responses:
+        '201': { description: Avis créé }
+
+  /avis/product/{id}:
+    get:
+      tags: [Avis]
+      summary: Avis d'un produit
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Liste des avis
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Avis' }
+
+  # ── Recherche IA ───────────────────────────────────────────────────────────
+  /search/ai:
+    post:
+      tags: [Recherche IA]
+      summary: Recherche en langage naturel (Claude AI)
+      description: |
+        Envoie une requête en langage naturel à Claude (claude-opus-4-7).
+        Claude extrait les mots-clés produits pertinents et la DB est interrogée.
+        Fallback automatique sur tokenisation si l'API est indisponible.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  example: "j'aimerais un ensemble de couverts dorés avec une table en bois"
+      responses:
+        '200':
+          description: Résultats de recherche IA
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResult' }
+        '400':
+          description: Requête vide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /search/recommendations/{productId}:
+    get:
+      tags: [Recherche IA]
+      summary: Recommandations produits similaires (Option C CDC)
+      description: |
+        Utilise Claude pour analyser le produit et recommander des produits similaires.
+        Implémente l'Option C du CDC : recommandations par IA.
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Produits recommandés
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  ai_reason: { type: string }
+                  recommendations: { type: array, items: { $ref: '#/components/schemas/Product' } }
+
+  /search:
+    get:
+      tags: [Recherche IA]
+      summary: Recherche classique par mot-clé
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+      responses:
+        '200':
+          description: Résultats de recherche
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedProducts' }
