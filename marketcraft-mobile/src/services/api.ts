@@ -22,10 +22,12 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login:    (data: { email: string; password: string }) => api.post('/auth/login', data),
-  register: (data: object) => api.post('/auth/register', data),
-  logout:   () => api.post('/auth/logout'),
-  me:       () => api.get('/auth/me'),
+  login:        (data: { email: string; password: string }) => api.post('/auth/login', data),
+  register:     (data: object)        => api.post('/auth/register', data),
+  logout:       ()                    => api.post('/auth/logout'),
+  me:           ()                    => api.get('/auth/me'),
+  updateMe:     (data: object)        => api.put('/auth/me', data),
+  refreshToken: (token: string)       => api.post('/auth/refresh', { refresh_token: token }),
 };
 
 export const productsAPI = {
@@ -50,6 +52,19 @@ export const ordersAPI = {
   getById:    (id: number)    => api.get(`/orders/${id}`),
   create:     (data: object)  => api.post('/orders', data),
   updateStatus:(id: number, status: string) => api.put(`/orders/${id}/status`, { statut: status }),
+};
+
+export const dashboardAPI = {
+  getVendeurStats:  () => api.get('/dashboard/stats'),
+  getAcheteurStats: () => api.get('/dashboard/acheteur'),
+};
+
+export const uploadAPI = {
+  image: (uri: string, name: string, type: string) => {
+    const form = new FormData();
+    form.append('image', { uri, name, type } as any);
+    return api.post('/upload/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 export default api;

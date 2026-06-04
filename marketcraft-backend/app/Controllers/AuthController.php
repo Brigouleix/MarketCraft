@@ -63,13 +63,15 @@ class AuthController extends Controller
                 return;
             }
 
-            $token = Auth::generateToken($user);
+            $accessToken  = Auth::generateToken($user);
+            $refreshToken = Auth::generateRefreshToken($user);
 
             $this->json([
-                'success' => true,
-                'message' => 'Registration successful.',
-                'token'   => $token,
-                'user'    => $user,
+                'success'       => true,
+                'message'       => 'Registration successful.',
+                'access_token'  => $accessToken,
+                'refresh_token' => $refreshToken,
+                'user'          => $user,
             ], 201);
         } catch (\Throwable $e) {
             $this->error('Registration failed: ' . $e->getMessage(), 500);
@@ -102,14 +104,16 @@ class AuthController extends Controller
             return;
         }
 
-        $userPublic = $this->userModel->toArray($user);
-        $token      = Auth::generateToken($userPublic);
+        $userPublic   = $this->userModel->toArray($user);
+        $accessToken  = Auth::generateToken($userPublic);
+        $refreshToken = Auth::generateRefreshToken($userPublic);
 
         $this->json([
-            'success' => true,
-            'message' => 'Login successful.',
-            'token'   => $token,
-            'user'    => $userPublic,
+            'success'       => true,
+            'message'       => 'Login successful.',
+            'access_token'  => $accessToken,
+            'refresh_token' => $refreshToken,
+            'user'          => $userPublic,
         ]);
     }
 
@@ -134,6 +138,61 @@ class AuthController extends Controller
         }
 
         $this->success($user);
+    }
+
+    // ------------------------------------------------------------------
+    // POST /auth/logout  (JWT required)
+    // ------------------------------------------------------------------
+
+    public function logout(array $params = []): void
+    {
+        // JWT est stateless : le client supprime son token côté front.
+        // On confirme juste la déconnexion.
+        $this->json(['success' => true, 'message' => 'Logged out successfully.']);
+    }
+
+    // ------------------------------------------------------------------
+    // POST /auth/refresh  (refresh_token requis)
+    // ------------------------------------------------------------------
+
+    public function refresh(array $params = []): void
+    {
+        $body = $this->getBody();
+
+        $refreshToken = $body['refresh_token'] ?? null;
+        if (empty($refreshToken)) {
+            $this->error('refresh_token is required.', 422);
+            return;
+        }
+
+        // Valider le refresh token (même secret, durée plus longue)
+        try {
+            $decoded = \Firebase\JWT\JWT::decode(
+                $refreshToken,
+                new \Firebase\JWT\Key($_ENV['JWT_SECRET'] ?? getenv('JWT_SECRET'), 'HS256')
+            );
+            $payload = (array) $decoded;
+        } catch (\Throwable) {
+            $this->error('Invalid or expired refresh token.', 401);
+            return;
+        }
+
+        $user = $this->userModel->findById((int) $payload['sub']);
+        if ($user === null) {
+            $this->error('User not found.', 404);
+            return;
+        }
+
+        $userPublic   = $this->userModel->toArray($user);
+        $accessToken  = Auth::generateToken($userPublic);
+        $newRefresh   = Auth::generateRefreshToken($userPublic);
+
+        $this->json([
+            'success'       => true,
+            'access_token'  => $accessToken,
+            'refresh_token' => $newRefresh,
+            'user'          => $userPublic,
+        ]);
     }
 
     // ------------------------------------------------------------------

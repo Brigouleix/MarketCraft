@@ -1,38 +1,95 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  FlatList, Image, TextInput, Alert,
+  Image, Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import { dashboardAPI, productsAPI, ordersAPI, boutiquesAPI } from '../services/api';
 import { colors, spacing, radius, shadow } from '../theme';
 
-const MOCK_ORDERS = [
-  { id: 1042, client: 'Sophie M.', montant: 90,  statut: 'pending',   date: '04/06/2026', produit: 'Vase céramique' },
-  { id: 1041, client: 'Paul D.',   montant: 45,  statut: 'shipped',   date: '02/06/2026', produit: 'Panier osier' },
-  { id: 1038, client: 'Laura B.',  montant: 135, statut: 'delivered', date: '28/05/2026', produit: 'Collier argent' },
-];
-
-const MOCK_PRODUCTS = [
-  { id: 1, nom: 'Vase céramique', prix: 45, stock: 8,  image: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&q=60' },
-  { id: 2, nom: 'Bol en grès',    prix: 32, stock: 0,  image: 'https://images.unsplash.com/photo-1481349518771-20055b2a7b24?w=200&q=60' },
-];
-
-const STATUS_MAP: Record<string, { label: string; bg: string; fg: string }> = {
-  pending:   { label: 'En attente', bg: '#fef9c3', fg: '#92400e' },
-  shipped:   { label: 'Expédié',    bg: '#dbeafe', fg: '#1e40af' },
-  delivered: { label: 'Livré',      bg: '#dcfce7', fg: '#166534' },
+const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
+  en_attente:     { label: 'En attente',     bg: '#fef9c3', fg: '#92400e' },
+  confirmee:      { label: 'Confirmée',      bg: '#dbeafe', fg: '#1e40af' },
+  en_preparation: { label: 'En préparation', bg: '#e0e7ff', fg: '#3730a3' },
+  expediee:       { label: 'Expédiée',       bg: '#f3e8ff', fg: '#6b21a8' },
+  livree:         { label: 'Livrée',         bg: '#dcfce7', fg: '#166534' },
+  annulee:        { label: 'Annulée',        bg: '#fee2e2', fg: '#991b1b' },
 };
 
 type Tab = 'overview' | 'orders' | 'products';
 
+function StatusBadge({ statut }: { statut: string }) {
+  const s = STATUS[statut] || { label: statut, bg: '#f3f4f6', fg: '#374151' };
+  return (
+    <View style={[styles.badge, { backgroundColor: s.bg }]}>
+      <Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text>
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<any>();
   const [tab, setTab] = useState<Tab>('overview');
+  const [stats, setStats]       = useState<any>(null);
+  const [orders, setOrders]     = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const tabs: { key: Tab; label: string; emoji: string }[] = [
-    { key: 'overview', label: 'Vue d\'ensemble', emoji: '📊' },
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const [statsRes, ordersRes, productsRes] = await Promise.all([
+        dashboardAPI.getVendeurStats(),
+        ordersAPI.getAll(),
+        productsAPI.getAll({ my: true }),
+      ]);
+      setStats(statsRes.data?.data ?? statsRes.data);
+      const od = ordersRes.data;
+      setOrders(Array.isArray(od) ? od : od?.data ?? od?.orders ?? []);
+      const pd = productsRes.data;
+      setProducts(Array.isArray(pd) ? pd : pd?.data ?? pd?.products ?? []);
+    } catch (e) {
+      // Silently fail — données vides affichées
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const onRefresh = () => { setRefreshing(true); load(true); };
+
+  const updateStatus = async (orderId: number, newStatus: string) => {
+    try {
+      await ordersAPI.updateStatus(orderId, newStatus);
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, statut: newStatus } : o));
+    } catch {
+      Alert.alert('Erreur', 'Impossible de mettre à jour le statut.');
+    }
+  };
+
+  const deleteProduct = (id: number) => {
+    Alert.alert('Supprimer', 'Supprimer ce produit ?', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: async () => {
+        try {
+          await productsAPI.delete(id);
+          setProducts((prev) => prev.filter((p) => p.id !== id));
+        } catch {
+          Alert.alert('Erreur', 'Impossible de supprimer ce produit.');
+        }
+      }},
+    ]);
+  };
+
+  const TABS: { key: Tab; label: string; emoji: string }[] = [
+    { key: 'overview', label: "Vue d'ensemble", emoji: '📊' },
     { key: 'orders',   label: 'Commandes',       emoji: '📦' },
-    { key: 'products', label: 'Produits',        emoji: '🏺' },
+    { key: 'products', label: 'Produits',         emoji: '🏺' },
   ];
 
   return (
@@ -41,114 +98,186 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Bonjour, {user?.prenom} 👋</Text>
-          <Text style={styles.shopName}>Céramiques de Lyon · Boutique active</Text>
+          <Text style={styles.shopLabel}>Dashboard vendeur</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={() => Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Déconnecter', style: 'destructive', onPress: logout },
-        ])}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() =>
+          Alert.alert('Déconnexion', '', [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Déconnecter', style: 'destructive', onPress: logout },
+          ])}>
           <Text style={styles.logoutText}>Quitter</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Tab bar */}
+      {/* Tabs */}
       <View style={styles.tabBar}>
-        {tabs.map(({ key, label, emoji }) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.tabBtn, tab === key && styles.tabBtnActive]}
-            onPress={() => setTab(key)}
-          >
+        {TABS.map(({ key, label, emoji }) => (
+          <TouchableOpacity key={key} style={[styles.tabBtn, tab === key && styles.tabBtnActive]} onPress={() => setTab(key)}>
             <Text style={styles.tabEmoji}>{emoji}</Text>
             <Text style={[styles.tabLabel, tab === key && styles.tabLabelActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {tab === 'overview' && <OverviewTab />}
-        {tab === 'orders'   && <OrdersTab />}
-        {tab === 'products' && <ProductsTab />}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        >
+          {tab === 'overview' && <OverviewTab stats={stats} orders={orders} />}
+          {tab === 'orders'   && <OrdersTab orders={orders} onUpdateStatus={updateStatus} />}
+          {tab === 'products' && <ProductsTab products={products} onDelete={deleteProduct} navigation={navigation} />}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
-function OverviewTab() {
+// ── Overview Tab ─────────────────────────────────────────────────────────────
+
+function OverviewTab({ stats, orders }: { stats: any; orders: any[] }) {
   const kpis = [
-    { label: 'Chiffre d\'affaires', val: '3 240 €', trend: '↑ +12% ce mois', color: colors.primary },
-    { label: 'Commandes',           val: '47',       trend: '↑ +5 cette semaine', color: colors.accent },
-    { label: 'Note moyenne',        val: '4.8 ★',   trend: 'Sur 24 avis',    color: colors.amber },
-    { label: 'Produits actifs',     val: '24',       trend: '3 en rupture',   color: colors.blue },
+    { label: "Chiffre d'affaires", val: `${Number(stats?.ca || 0).toFixed(0)} €`, color: colors.accent },
+    { label: 'Commandes',           val: String(stats?.nb_commandes || 0),         color: colors.primary },
+    { label: 'Note moyenne',        val: `${Number(stats?.note_moyenne || 0).toFixed(1)} ★`, color: '#d97706' },
+    { label: 'Produits actifs',     val: String(stats?.nb_produits || 0),           color: '#2563eb' },
   ];
+
   return (
     <View style={{ padding: spacing.md }}>
+      {/* KPI grid */}
       <View style={styles.kpiGrid}>
         {kpis.map((k) => (
           <View key={k.label} style={styles.kpiCard}>
             <Text style={styles.kpiLabel}>{k.label}</Text>
             <Text style={[styles.kpiVal, { color: k.color }]}>{k.val}</Text>
-            <Text style={styles.kpiTrend}>{k.trend}</Text>
           </View>
         ))}
       </View>
-      <Text style={styles.sectionTitle}>Dernières commandes</Text>
-      {MOCK_ORDERS.map((o) => <OrderRow key={o.id} order={o} />)}
+
+      {/* Top produits */}
+      {stats?.top_produits?.length > 0 && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Top produits</Text>
+          {stats.top_produits.map((p: any, i: number) => (
+            <View key={p.id} style={styles.topProdRow}>
+              <Text style={styles.topProdRank}>#{i + 1}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.topProdName} numberOfLines={1}>{p.nom}</Text>
+                <Text style={styles.topProdSub}>{p.nb_vendus} vendu(s)</Text>
+              </View>
+              <Text style={styles.topProdRevenu}>{Number(p.revenu).toFixed(0)} €</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Commandes récentes */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>Commandes récentes</Text>
+        {(stats?.commandes_recentes?.length > 0) ? stats.commandes_recentes.slice(0, 5).map((o: any) => (
+          <View key={o.id} style={styles.orderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.orderId}>#{o.id} — {o.client_prenom} {o.client_nom}</Text>
+              <Text style={styles.orderDate}>{new Date(o.created_at).toLocaleDateString('fr-FR')}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <Text style={styles.orderAmount}>{Number(o.montant_total).toFixed(0)} €</Text>
+              <StatusBadge statut={o.statut} />
+            </View>
+          </View>
+        )) : (
+          <Text style={styles.empty}>Aucune commande reçue.</Text>
+        )}
+      </View>
     </View>
   );
 }
 
-function OrdersTab() {
-  return (
-    <View style={{ padding: spacing.md }}>
-      <Text style={styles.sectionTitle}>Toutes les commandes</Text>
-      {MOCK_ORDERS.map((o) => <OrderRow key={o.id} order={o} detailed />)}
-    </View>
-  );
-}
+// ── Orders Tab ───────────────────────────────────────────────────────────────
 
-function ProductsTab() {
+const NEXT_STATUS: Record<string, string | null> = {
+  en_attente:     'confirmee',
+  confirmee:      'en_preparation',
+  en_preparation: 'expediee',
+  expediee:       'livree',
+  livree:         null,
+  annulee:        null,
+};
+
+function OrdersTab({ orders, onUpdateStatus }: { orders: any[]; onUpdateStatus: (id: number, s: string) => void }) {
   return (
     <View style={{ padding: spacing.md }}>
-      <TouchableOpacity style={styles.addProductBtn}>
-        <Text style={styles.addProductBtnText}>+ Ajouter un produit</Text>
-      </TouchableOpacity>
-      {MOCK_PRODUCTS.map((p) => (
-        <View key={p.id} style={styles.productRow}>
-          <Image source={{ uri: p.image }} style={styles.productThumb} resizeMode="cover" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.productName}>{p.nom}</Text>
-            <Text style={styles.productPrice}>{p.prix} €</Text>
-            <Text style={[styles.stockBadge, p.stock === 0 && styles.stockOut]}>
-              {p.stock === 0 ? '✗ Rupture de stock' : `✓ ${p.stock} en stock`}
+      <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>Toutes les commandes ({orders.length})</Text>
+      {orders.length === 0 ? (
+        <Text style={styles.empty}>Aucune commande pour l'instant.</Text>
+      ) : orders.map((o) => {
+        const next = NEXT_STATUS[o.statut];
+        const nextLabel = next ? STATUS[next]?.label : null;
+        return (
+          <View key={o.id} style={styles.sectionCard}>
+            <View style={styles.orderHeader}>
+              <Text style={styles.orderId}>#{o.id}</Text>
+              <StatusBadge statut={o.statut} />
+            </View>
+            <Text style={styles.orderClient}>
+              {o.client_prenom ?? o.utilisateur_prenom ?? ''} {o.client_nom ?? o.utilisateur_nom ?? '–'}
             </Text>
+            <View style={[styles.orderRow, { marginTop: 8 }]}>
+              <Text style={styles.orderDate}>{new Date(o.created_at).toLocaleDateString('fr-FR')}</Text>
+              <Text style={styles.orderAmount}>{Number(o.montant_total ?? o.total ?? 0).toFixed(2)} €</Text>
+            </View>
+            {nextLabel && (
+              <TouchableOpacity style={styles.advanceBtn} onPress={() => onUpdateStatus(o.id, next!)}>
+                <Text style={styles.advanceBtnText}>→ Passer à : {nextLabel}</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={styles.productActions}>
-            <TouchableOpacity style={styles.editBtn}><Text style={styles.editBtnText}>✏️</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.deleteBtn}><Text style={styles.deleteBtnText}>🗑</Text></TouchableOpacity>
-          </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
 
-function OrderRow({ order, detailed }: { order: typeof MOCK_ORDERS[0]; detailed?: boolean }) {
-  const status = STATUS_MAP[order.statut];
+// ── Products Tab ─────────────────────────────────────────────────────────────
+
+function ProductsTab({ products, onDelete, navigation }: { products: any[]; onDelete: (id: number) => void; navigation: any }) {
   return (
-    <View style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <Text style={styles.orderId}>#{order.id}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-          <Text style={[styles.statusText, { color: status.fg }]}>{status.label}</Text>
-        </View>
+    <View style={{ padding: spacing.md }}>
+      <View style={styles.prodHeader}>
+        <Text style={styles.sectionTitle}>Mes produits ({products.length})</Text>
       </View>
-      <Text style={styles.orderClient}>{order.client}</Text>
-      {detailed && <Text style={styles.orderProduct}>{order.produit}</Text>}
-      <View style={styles.orderFooter}>
-        <Text style={styles.orderDate}>{order.date}</Text>
-        <Text style={styles.orderAmount}>{order.montant} €</Text>
-      </View>
+      {products.length === 0 ? (
+        <Text style={styles.empty}>Aucun produit. Créez-en un depuis le web.</Text>
+      ) : products.map((p) => {
+        const imgs = typeof p.images === 'string' ? JSON.parse(p.images || '[]') : (p.images || []);
+        return (
+          <View key={p.id} style={styles.productRow}>
+            {imgs[0] ? (
+              <Image source={{ uri: imgs[0] }} style={styles.productThumb} resizeMode="cover" />
+            ) : (
+              <View style={[styles.productThumb, { backgroundColor: colors.secondary300, alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ fontSize: 20 }}>🖼</Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.productName} numberOfLines={1}>{p.nom}</Text>
+              <Text style={styles.productPrice}>{Number(p.prix).toFixed(2)} €</Text>
+              <Text style={[styles.stockText, { color: p.stock > 0 ? colors.accent : colors.red }]}>
+                {p.stock > 0 ? `✓ ${p.stock} en stock` : '✗ Épuisé'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => onDelete(p.id)} style={styles.deleteBtn}>
+              <Text style={{ fontSize: 16 }}>🗑</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -156,71 +285,69 @@ function OrderRow({ order, detailed }: { order: typeof MOCK_ORDERS[0]; detailed?
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.secondary },
   header: {
-    backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.md,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: colors.primary, paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md, flexDirection: 'row',
+    justifyContent: 'space-between', alignItems: 'center',
   },
-  greeting: { fontSize: 18, fontWeight: '700', color: colors.white },
-  shopName: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  greeting:  { fontSize: 18, fontWeight: '700', color: colors.white },
+  shopLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
   logoutBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.sm },
-  logoutText: { color: colors.white, fontSize: 12, fontWeight: '600' },
-
-  tabBar: {
-    flexDirection: 'row', backgroundColor: colors.white,
-    borderBottomWidth: 1, borderBottomColor: colors.secondary300,
-  },
-  tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 2 },
+  logoutText:{ color: colors.white, fontSize: 12, fontWeight: '600' },
+  tabBar:    { flexDirection: 'row', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.secondary300 },
+  tabBtn:    { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 2 },
   tabBtnActive: { borderBottomWidth: 2, borderBottomColor: colors.primary },
-  tabEmoji: { fontSize: 16 },
-  tabLabel: { fontSize: 11, color: colors.gray600, fontWeight: '500' },
+  tabEmoji:  { fontSize: 16 },
+  tabLabel:  { fontSize: 11, color: colors.gray600, fontWeight: '500' },
   tabLabelActive: { color: colors.primary, fontWeight: '700' },
+  content:   { flex: 1 },
+  loadingWrap:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
+  empty:     { color: colors.gray400, fontSize: 14, textAlign: 'center', paddingVertical: spacing.lg },
 
-  content: { flex: 1 },
-
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: spacing.lg },
-  kpiCard: {
+  kpiGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: spacing.md },
+  kpiCard:   {
     width: '47%', backgroundColor: colors.white, borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.secondary300, ...shadow.craft,
   },
-  kpiLabel: { fontSize: 11, color: colors.gray600, fontWeight: '500', marginBottom: 6 },
-  kpiVal: { fontSize: 24, fontWeight: '700' },
-  kpiTrend: { fontSize: 11, color: colors.accent, marginTop: 4 },
+  kpiLabel:  { fontSize: 11, color: colors.gray600, marginBottom: 6 },
+  kpiVal:    { fontSize: 22, fontWeight: '700' },
 
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.gray800, marginBottom: spacing.sm },
-
-  orderCard: {
+  sectionCard: {
     backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.md,
     marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.secondary300, ...shadow.craft,
   },
-  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  orderId: { fontSize: 13, fontWeight: '700', color: colors.gray800 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  orderClient: { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 2 },
-  orderProduct: { fontSize: 12, color: colors.gray600, marginBottom: 6 },
-  orderFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  orderDate: { fontSize: 11, color: colors.gray400 },
-  orderAmount: { fontSize: 15, fontWeight: '700', color: colors.primary },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.gray800, marginBottom: spacing.sm },
 
-  addProductBtn: {
-    backgroundColor: colors.primary, paddingVertical: 12, borderRadius: radius.md,
-    alignItems: 'center', marginBottom: spacing.md, ...shadow.craft,
-  },
-  addProductBtnText: { color: colors.white, fontWeight: '700', fontSize: 14 },
+  topProdRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
+  topProdRank:{ fontSize: 12, fontWeight: '700', color: colors.gray400, width: 24 },
+  topProdName:{ fontSize: 13, fontWeight: '600', color: colors.gray800 },
+  topProdSub: { fontSize: 11, color: colors.gray600 },
+  topProdRevenu:{ fontSize: 14, fontWeight: '700', color: colors.primary },
 
-  productRow: {
-    flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.white,
-    borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.sm,
-    borderWidth: 1, borderColor: colors.secondary300, ...shadow.craft,
+  orderRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  orderHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  orderId:    { fontSize: 13, fontWeight: '700', color: colors.gray800 },
+  orderClient:{ fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 4 },
+  orderDate:  { fontSize: 11, color: colors.gray400 },
+  orderAmount:{ fontSize: 15, fontWeight: '700', color: colors.primary },
+  advanceBtn: {
+    marginTop: spacing.sm, backgroundColor: colors.primaryLight,
+    paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.sm,
     alignItems: 'center',
   },
-  productThumb: { width: 60, height: 60, borderRadius: radius.sm },
-  productName: { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 2 },
-  productPrice: { fontSize: 14, fontWeight: '700', color: colors.primary, marginBottom: 4 },
-  stockBadge: { fontSize: 11, color: colors.accent, fontWeight: '600' },
-  stockOut: { color: colors.red },
-  productActions: { gap: 6 },
-  editBtn: { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
-  editBtnText: { fontSize: 14 },
-  deleteBtn: { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.redLight, alignItems: 'center', justifyContent: 'center' },
-  deleteBtnText: { fontSize: 14 },
+  advanceBtnText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+
+  badge:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full },
+  badgeText: { fontSize: 10, fontWeight: '700' },
+
+  prodHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  productRow:{
+    flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.white,
+    borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.sm,
+    borderWidth: 1, borderColor: colors.secondary300, ...shadow.craft, alignItems: 'center',
+  },
+  productThumb:{ width: 56, height: 56, borderRadius: radius.sm },
+  productName: { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: 2 },
+  productPrice:{ fontSize: 14, fontWeight: '700', color: colors.primary, marginBottom: 2 },
+  stockText:   { fontSize: 11, fontWeight: '600' },
+  deleteBtn:   { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.redLight, alignItems: 'center', justifyContent: 'center' },
 });

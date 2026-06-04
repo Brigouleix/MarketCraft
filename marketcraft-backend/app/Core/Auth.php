@@ -64,6 +64,28 @@ class Auth
     }
 
     // ------------------------------------------------------------------
+    // Génération du refresh token (durée plus longue : 30 jours)
+    // ------------------------------------------------------------------
+
+    public static function generateRefreshToken(array $user): string
+    {
+        $now = time();
+
+        $payload = [
+            'iss'  => $_ENV['APP_URL'] ?? getenv('APP_URL') ?: 'marketcraft',
+            'iat'  => $now,
+            'nbf'  => $now,
+            'exp'  => $now + 86400 * 30,
+            'sub'  => (string) $user['id'],
+            'email'=> $user['email'],
+            'role' => $user['role'],
+            'type' => 'refresh',
+        ];
+
+        return JWT::encode($payload, self::getSecret(), self::$algorithm);
+    }
+
+    // ------------------------------------------------------------------
     // Validation du token (depuis le header Authorization)
     // ------------------------------------------------------------------
 

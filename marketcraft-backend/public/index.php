@@ -79,6 +79,13 @@ $requestUri  = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $scriptDir   = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $requestUri  = '/' . ltrim(substr($requestUri, strlen($scriptDir)), '/');
 
+// Supprimer le préfixe /api si présent
+if (str_starts_with($requestUri, '/api/')) {
+    $requestUri = substr($requestUri, 4); // retire "/api"
+} elseif ($requestUri === '/api') {
+    $requestUri = '/';
+}
+
 // ---------------------------------------------------------------------------
 // 5. Dispatch vers le Router
 // ---------------------------------------------------------------------------

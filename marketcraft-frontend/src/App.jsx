@@ -17,6 +17,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const BoutiquePage = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
+const BuyerStatsPage = lazy(() => import('./pages/BuyerStatsPage'));
 
 function PageLoader() {
   return (
@@ -75,6 +76,14 @@ export default function App() {
               element={
                 <ProtectedRoute role="vendeur">
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mes-stats"
+              element={
+                <ProtectedRoute>
+                  <BuyerStatsPage />
                 </ProtectedRoute>
               }
             />

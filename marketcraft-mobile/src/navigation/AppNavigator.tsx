@@ -8,14 +8,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { colors } from '../theme';
 
-import HomeScreen         from '../screens/HomeScreen';
-import CatalogScreen      from '../screens/CatalogScreen';
+import HomeScreen          from '../screens/HomeScreen';
+import CatalogScreen       from '../screens/CatalogScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
-import CartScreen         from '../screens/CartScreen';
-import CheckoutScreen     from '../screens/CheckoutScreen';
-import LoginScreen        from '../screens/LoginScreen';
-import RegisterScreen     from '../screens/RegisterScreen';
-import DashboardScreen    from '../screens/DashboardScreen';
+import CartScreen          from '../screens/CartScreen';
+import CheckoutScreen      from '../screens/CheckoutScreen';
+import LoginScreen         from '../screens/LoginScreen';
+import RegisterScreen      from '../screens/RegisterScreen';
+import DashboardScreen     from '../screens/DashboardScreen';
+import BuyerStatsScreen    from '../screens/BuyerStatsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
@@ -70,6 +71,20 @@ function MainTabs() {
             title: 'Dashboard',
             tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📊</Text>,
             headerShown: false,
+          }}
+        />
+      )}
+      {isAuthenticated && !isVendeur && (
+        <Tab.Screen
+          name="MesStats"
+          component={BuyerStatsScreen}
+          options={{
+            title: 'Mes stats',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📈</Text>,
+            headerStyle: { backgroundColor: colors.white },
+            headerTintColor: colors.primary,
+            headerTitleStyle: { fontWeight: '700' },
+            headerTitle: 'Mes statistiques',
           }}
         />
       )}
