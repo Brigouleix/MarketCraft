@@ -36,11 +36,20 @@ class ProductController extends Controller
         $sort      = $this->getParam('sort', 'created_at');
         $order     = strtoupper($this->getParam('order', 'DESC'));
 
-        $items = $this->productModel->findAll(
-            $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order
-        );
+        // ?my=true → produits du vendeur connecté uniquement
+        $myOnly = in_array($this->getParam('my'), ['1', 'true'], true);
 
-        $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax);
+        if ($myOnly && Auth::hasRole('vendeur', 'admin')) {
+            $auth      = Auth::getCurrentUser();
+            $vendeurId = (int) $auth['sub'];
+            $items     = $this->productModel->findByVendeur($vendeurId, $page, $limit);
+            $total     = $this->productModel->countByVendeur($vendeurId);
+        } else {
+            $items = $this->productModel->findAll(
+                $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order
+            );
+            $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax);
+        }
 
         $this->paginated($items, $total, $page, $limit);
     }

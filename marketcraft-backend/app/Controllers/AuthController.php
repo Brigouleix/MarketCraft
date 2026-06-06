@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Auth;
+use App\Core\Logger;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -65,11 +66,13 @@ class AuthController extends Controller
 
             $token = Auth::generateToken($user);
 
+            Logger::info('User registered', ['user_id' => $user['id'], 'role' => $user['role']]);
+
             $this->json([
-                'success' => true,
-                'message' => 'Registration successful.',
-                'token'   => $token,
-                'user'    => $user,
+                'success'      => true,
+                'message'      => 'Registration successful.',
+                'access_token' => $token,
+                'user'         => $user,
             ], 201);
         } catch (\Throwable $e) {
             $this->error('Registration failed: ' . $e->getMessage(), 500);
@@ -97,6 +100,7 @@ class AuthController extends Controller
         $user = $this->userModel->findByEmail($body['email']);
 
         if ($user === null || !$this->userModel->verifyPassword($body['password'], $user['password_hash'])) {
+            Logger::warning('Failed login attempt', ['email' => $body['email']]);
             // Message générique pour éviter l'énumération d'emails
             $this->error('Invalid email or password.', 401);
             return;
@@ -105,11 +109,13 @@ class AuthController extends Controller
         $userPublic = $this->userModel->toArray($user);
         $token      = Auth::generateToken($userPublic);
 
+        Logger::info('User logged in', ['user_id' => $userPublic['id'], 'role' => $userPublic['role']]);
+
         $this->json([
-            'success' => true,
-            'message' => 'Login successful.',
-            'token'   => $token,
-            'user'    => $userPublic,
+            'success'      => true,
+            'message'      => 'Login successful.',
+            'access_token' => $token,
+            'user'         => $userPublic,
         ]);
     }
 

@@ -15,16 +15,17 @@ use App\Controllers\ProductController;
 use App\Controllers\BoutiqueController;
 use App\Controllers\OrderController;
 use App\Controllers\AvisController;
+use App\Controllers\DashboardController;
 
 // =========================================================================
 // AUTH
 // =========================================================================
 
 // POST /auth/register  – Inscription
-$router->post('/auth/register', [AuthController::class, 'register']);
+$router->post('/api/auth/register', [AuthController::class, 'register']);
 
 // POST /auth/login     – Connexion
-$router->post('/auth/login', [AuthController::class, 'login']);
+$router->post('/api/auth/login', [AuthController::class, 'login']);
 
 // GET  /auth/me        – Profil de l'utilisateur connecté
 $router->get('/auth/me', [AuthController::class, 'me'], ['auth']);
@@ -83,8 +84,9 @@ $router->get('/orders/:id', [OrderController::class, 'show'], ['auth']);
 // POST   /orders           – Passer une commande (JWT)
 $router->post('/orders', [OrderController::class, 'store'], ['auth']);
 
-// PUT    /orders/:id/status – Changer le statut (JWT + vendeur/admin)
+// PUT/PATCH /orders/:id/status – Changer le statut (JWT + vendeur/admin)
 $router->put('/orders/:id/status', [OrderController::class, 'updateStatus'], ['auth']);
+$router->patch('/orders/:id/status', [OrderController::class, 'updateStatus'], ['auth']);
 
 // DELETE /orders/:id       – Annuler une commande (JWT + owner)
 $router->delete('/orders/:id', [OrderController::class, 'destroy'], ['auth']);
@@ -101,6 +103,16 @@ $router->post('/products/:id/avis', [AvisController::class, 'store'], ['auth']);
 
 // DELETE /avis/:id           – Supprimer un avis (JWT + owner/admin)
 $router->delete('/avis/:id', [AvisController::class, 'destroy'], ['auth']);
+
+// =========================================================================
+// DASHBOARD VENDEUR
+// =========================================================================
+
+// GET /dashboard/stats   – KPIs du vendeur connecté (JWT + vendeur/admin)
+$router->get('/dashboard/stats', [DashboardController::class, 'stats'], ['auth']);
+
+// GET /vendor/orders     – Commandes liées aux boutiques du vendeur (JWT + vendeur/admin)
+$router->get('/vendor/orders', [DashboardController::class, 'vendorOrders'], ['auth']);
 
 // =========================================================================
 // RECHERCHE

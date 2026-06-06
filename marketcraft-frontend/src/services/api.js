@@ -126,6 +126,12 @@ export const dashboardAPI = {
   getStats: () => api.get('/dashboard/stats'),
 };
 
+// ── Vendor ────────────────────────────────────────────────────────────────────
+export const vendorAPI = {
+  getOrders: (params) => api.get('/vendor/orders', { params }),
+  getProducts: (params) => api.get('/products', { params: { ...params, my: 'true' } }),
+};
+
 // ── AI Search ─────────────────────────────────────────────────────────────────
 export const searchAPI = {
   aiSearch: (query) => api.post('/search/ai', { query }),

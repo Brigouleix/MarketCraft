@@ -83,9 +83,17 @@ $requestUri  = '/' . ltrim(substr($requestUri, strlen($scriptDir)), '/');
 // 5. Dispatch vers le Router
 // ---------------------------------------------------------------------------
 use App\Core\Router;
+use App\Core\Logger;
 
 $router = new Router();
 
 require_once dirname(__DIR__) . '/routes/web.php';
 
+$_requestStart = microtime(true);
+
 $router->dispatch($method, $requestUri);
+
+// Log every request after dispatch (status code is already sent)
+$statusCode  = http_response_code();
+$durationMs  = (microtime(true) - $_requestStart) * 1000;
+Logger::request($method, $requestUri, is_int($statusCode) ? $statusCode : 200, $durationMs);
