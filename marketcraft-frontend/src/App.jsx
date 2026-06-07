@@ -16,6 +16,7 @@ const DashboardPage     = lazy(() => import('./pages/DashboardPage'));
 const BoutiquePage      = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage       = lazy(() => import('./pages/ProfilePage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
+const BuyerStatsPage = lazy(() => import('./pages/BuyerStatsPage'));
 
 function PageLoader() {
   return (
@@ -50,6 +51,47 @@ export default function App() {
             <Route path="/dashboard" element={
               <ProtectedRoute role="vendeur"><DashboardPage /></ProtectedRoute>
             } />
+            {/* Protected routes */}
+            <Route
+              path="/panier"
+              element={
+                <ProtectedRoute>
+                  <CartPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute>
+                  <CheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profil"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute role="vendeur">
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mes-stats"
+              element={
+                <ProtectedRoute>
+                  <BuyerStatsPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="*" element={
               <div className="min-h-[60vh] flex flex-col items-center justify-center gap-6 px-4 text-center">

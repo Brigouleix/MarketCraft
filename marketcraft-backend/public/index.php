@@ -84,6 +84,13 @@ if (str_starts_with($requestUri, '/api/') || $requestUri === '/api') {
     $requestUri = substr($requestUri, 4) ?: '/';
 }
 
+// Supprimer le préfixe /api si présent
+if (str_starts_with($requestUri, '/api/')) {
+    $requestUri = substr($requestUri, 4); // retire "/api"
+} elseif ($requestUri === '/api') {
+    $requestUri = '/';
+}
+
 // ---------------------------------------------------------------------------
 // 5. Dispatch vers le Router
 // ---------------------------------------------------------------------------

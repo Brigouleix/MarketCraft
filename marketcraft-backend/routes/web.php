@@ -16,6 +16,7 @@ use App\Controllers\BoutiqueController;
 use App\Controllers\OrderController;
 use App\Controllers\AvisController;
 use App\Controllers\DashboardController;
+use App\Controllers\UploadController;
 
 // =========================================================================
 // AUTH
@@ -29,6 +30,12 @@ $router->post('/auth/register', [AuthController::class, 'register']);
 
 // POST /auth/login     – Connexion
 $router->post('/auth/login', [AuthController::class, 'login']);
+
+// POST /auth/logout    – Déconnexion
+$router->post('/auth/logout', [AuthController::class, 'logout'], ['auth']);
+
+// POST /auth/refresh   – Rafraîchissement du token
+$router->post('/auth/refresh', [AuthController::class, 'refresh']);
 
 // GET  /auth/me        – Profil de l'utilisateur connecté
 $router->get('/auth/me', [AuthController::class, 'me'], ['auth']);
@@ -131,6 +138,26 @@ $router->post('/search/ai', [SearchController::class, 'aiSearch']);
 
 // GET  /search     – Recherche simple (public)
 $router->get('/search', [SearchController::class, 'search']);
+
+// =========================================================================
+// DASHBOARD
+// =========================================================================
+
+// GET /dashboard/stats    – Stats vendeur (JWT + vendeur/admin)
+$router->get('/dashboard/stats', [DashboardController::class, 'vendeurStats'], ['auth']);
+
+// GET /dashboard/acheteur – Stats acheteur (JWT)
+$router->get('/dashboard/acheteur', [DashboardController::class, 'acheteurStats'], ['auth']);
+
+// =========================================================================
+// UPLOAD
+// =========================================================================
+
+// POST /upload/image   – Upload d'une image (JWT)
+$router->post('/upload/image', [UploadController::class, 'image'], ['auth']);
+
+// POST /upload/images  – Upload multiple (JWT)
+$router->post('/upload/images', [UploadController::class, 'images'], ['auth']);
 
 // =========================================================================
 // ROUTE DE SANTÉ

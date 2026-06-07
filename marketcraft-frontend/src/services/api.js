@@ -80,12 +80,12 @@ api.interceptors.response.use(
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 export const authAPI = {
-  login: (credentials) => api.post('/auth/login', credentials),
-  register: (userData) => api.post('/auth/register', userData),
-  me: () => api.get('/auth/me'),
-  logout: () => api.post('/auth/logout'),
-  refreshToken: (refreshToken) => api.post('/auth/refresh', { refresh_token: refreshToken }),
-  captcha: () => api.get('/auth/captcha'),
+  login:        (credentials) => api.post('/auth/login', credentials),
+  register:     (userData)    => api.post('/auth/register', userData),
+  me:           ()            => api.get('/auth/me'),
+  updateMe:     (data)        => api.put('/auth/me', data),
+  logout:       ()            => api.post('/auth/logout'),
+  refreshToken: (token)       => api.post('/auth/refresh', { refresh_token: token }),
 };
 
 // ── Products ─────────────────────────────────────────────────────────────────
@@ -132,6 +132,22 @@ export const dashboardAPI = {
 export const vendorAPI = {
   getOrders: (params) => api.get('/vendor/orders', { params }),
   getProducts: (params) => api.get('/products', { params: { ...params, my: 'true' } }),
+  getVendeurStats:  () => api.get('/dashboard/stats'),
+  getAcheteurStats: () => api.get('/dashboard/acheteur'),
+};
+
+// ── Upload ───────────────────────────────────────────────────────────────────
+export const uploadAPI = {
+  image:  (file) => {
+    const form = new FormData();
+    form.append('image', file);
+    return api.post('/upload/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  images: (files) => {
+    const form = new FormData();
+    files.forEach((f) => form.append('images[]', f));
+    return api.post('/upload/images', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 // ── AI Search ─────────────────────────────────────────────────────────────────

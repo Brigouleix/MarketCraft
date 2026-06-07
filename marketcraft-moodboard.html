@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarketCraft — Moodboard & Maquettes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Georgia&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Variables ────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:      #8B4513;
+      --primary-600:  #7a3c10;
+      --primary-100:  #fae8d8;
+      --secondary:    #F5F0E8;
+      --secondary-200:#f5f0e8;
+      --secondary-300:#ede4d4;
+      --secondary-400:#e0d2b8;
+      --accent:       #6B7C3F;
+      --accent-100:   #e5ebd5;
+      --amber:        #fbbf24;
+      --white:        #ffffff;
+      --gray-600:     #4b5563;
+      --gray-800:     #1f2937;
+      --shadow-craft: 0 4px 6px -1px rgba(139,69,19,.10), 0 2px 4px -1px rgba(139,69,19,.06);
+      --shadow-lg:    0 10px 15px -3px rgba(139,69,19,.15), 0 4px 6px -2px rgba(139,69,19,.08);
+      --font-sans:    'Inter', system-ui, sans-serif;
+      --font-serif:   'Georgia', Cambria, serif;
+      --radius:       12px;
+    }
+
+    body { font-family: var(--font-sans); background: #faf7f2; color: var(--gray-800); }
+    h1,h2,h3,h4 { font-family: var(--font-serif); }
+
+    /* ── Layout helpers ────────────────────────────────── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+    .section { margin-bottom: 80px; }
+    .section-label {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--primary); background: var(--primary-100);
+      padding: 4px 12px; border-radius: 20px; margin-bottom: 20px;
+    }
+    .section-title { font-size: 28px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+    .section-sub { color: var(--gray-600); font-size: 15px; margin-bottom: 32px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+
+    /* ── Cover ─────────────────────────────────────────── */
+    .cover {
+      background: linear-gradient(135deg, var(--primary) 0%, #5a3010 60%, var(--accent) 100%);
+      color: white; text-align: center; padding: 80px 24px;
+      border-radius: 20px; margin-bottom: 60px;
+    }
+    .cover-tag {
+      display: inline-block; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+      font-size: 13px; padding: 6px 18px; border-radius: 20px; margin-bottom: 24px;
+    }
+    .cover h1 { font-size: 56px; font-weight: 700; line-height: 1.1; margin-bottom: 16px; }
+    .cover h1 span { color: var(--amber); }
+    .cover p { font-size: 18px; opacity: .8; }
+
+    /* ── Moodboard ─────────────────────────────────────── */
+    .palette { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .swatch {
+      width: 90px;
+    }
+    .swatch-color {
+      height: 70px; border-radius: 12px; border: 1px solid rgba(0,0,0,.08);
+      box-shadow: var(--shadow-craft);
+    }
+    .swatch-name { font-size: 11px; font-weight: 600; margin-top: 6px; text-align: center; }
+    .swatch-hex  { font-size: 10px; color: var(--gray-600); text-align: center; }
+
+    .typo-row { display: flex; gap: 40px; align-items: baseline; flex-wrap: wrap; margin-bottom: 16px; }
+
+    .mood-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    .mood-cell {
+      border-radius: var(--radius); overflow: hidden;
+      aspect-ratio: 4/3; background: var(--secondary-300);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--gray-600); font-style: italic;
+      box-shadow: var(--shadow-craft);
+    }
+    .mood-cell.tall { aspect-ratio: 3/4; grid-row: span 2; }
+
+    .keyword-list { display: flex; gap: 10px; flex-wrap: wrap; }
+    .keyword {
+      background: var(--white); border: 1.5px solid var(--secondary-400);
+      padding: 6px 16px; border-radius: 20px; font-size: 13px;
+      color: var(--gray-800); box-shadow: var(--shadow-craft);
+    }
+
+    /* ── Mockups ────────────────────────────────────────── */
+    /* Shared chrome */
+    .mockup-frame {
+      border: 1px solid var(--secondary-400);
+      border-radius: 16px; overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      background: var(--white);
+    }
+    .mockup-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--gray-600); margin-bottom: 10px;
+    }
+
+    /* Navbar mockup */
+    .nav-mock {
+      background: rgba(255,255,255,.97);
+      border-bottom: 1px solid var(--secondary-300);
+      padding: 10px 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 8px; }
+    .nav-logo-icon {
+      width: 32px; height: 32px; background: var(--primary); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; color: white; font-size: 14px;
+    }
+    .nav-logo-text { font-family: var(--font-serif); font-weight: 700; font-size: 18px; color: var(--primary); }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-link {
+      padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+      color: var(--gray-600); cursor: pointer;
+    }
+    .nav-link.active { background: var(--secondary); color: var(--primary); }
+    .nav-search {
+      flex: 1; max-width: 220px;
+      padding: 7px 12px 7px 32px; border: 1px solid var(--secondary-400);
+      border-radius: 8px; font-size: 13px; background: var(--secondary-200);
+      color: var(--gray-800); position: relative;
+    }
+    .nav-actions { display: flex; gap: 8px; align-items: center; }
+    .nav-btn {
+      padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1.5px solid;
+    }
+    .nav-btn-outline { border-color: var(--primary); color: var(--primary); background: transparent; }
+    .nav-btn-fill   { border-color: var(--primary); color: white; background: var(--primary); }
+    .nav-cart {
+      width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+      border-radius: 8px; background: var(--secondary); color: var(--gray-600);
+      font-size: 16px; position: relative;
+    }
+    .nav-cart-badge {
+      position: absolute; top: -4px; right: -4px; width: 16px; height: 16px;
+      background: var(--primary); color: white; border-radius: 50%;
+      font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    }
+    .ai-badge {
+      padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+      color: #7c3aed; border: 1px solid #c4b5fd; background: #f5f3ff; display: flex; gap: 4px; align-items: center;
+    }
+
+    /* Hero mockup */
+    .hero-mock {
+      background: linear-gradient(to bottom right, rgba(0,0,0,.65), rgba(139,69,19,.4), rgba(107,124,63,.3)),
+                  url('https://images.unsplash.com/photo-1452860606245-08befc0ff44b?w=900&q=60') center/cover;
+      min-height: 400px;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 60px 24px;
+    }
+    .hero-tag {
+      display: inline-block; background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.2); color: white;
+      font-size: 12px; padding: 5px 16px; border-radius: 20px; margin-bottom: 20px;
+    }
+    .hero-h1 { font-size: 52px; font-weight: 700; color: white; line-height: 1.1; margin-bottom: 16px; }
+    .hero-h1 span { color: var(--amber); }
+    .hero-p { font-size: 16px; color: rgba(255,255,255,.85); max-width: 440px; margin: 0 auto 28px; }
+    .hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .hero-btn-fill {
+      background: var(--primary); color: white; padding: 12px 28px; border-radius: 12px;
+      font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px;
+    }
+    .hero-btn-glass {
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+      color: white; padding: 12px 28px; border-radius: 12px;
+      font-weight: 600; font-size: 14px;
+    }
+    .hero-stats { display: flex; gap: 40px; justify-content: center; margin-top: 48px; }
+    .hero-stat-val { font-size: 22px; font-weight: 700; color: white; }
+    .hero-stat-lab { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 2px; }
+
+    /* Categories */
+    .cat-grid { display: grid; grid-template-columns: repeat(8,1fr); gap: 16px; padding: 24px; }
+    .cat-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .cat-icon {
+      width: 54px; height: 54px; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+      box-shadow: var(--shadow-craft);
+    }
+    .cat-label { font-size: 11px; font-weight: 500; color: var(--gray-800); text-align: center; }
+
+    /* Product card */
+    .product-card {
+      background: white; border-radius: var(--radius);
+      border: 1px solid var(--secondary-300);
+      box-shadow: var(--shadow-craft); overflow: hidden;
+    }
+    .product-img {
+      aspect-ratio: 1; background: var(--secondary-300);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; overflow: hidden;
+    }
+    .product-img img { width: 100%; height: 100%; object-fit: cover; }
+    .product-body { padding: 14px; }
+    .product-cat { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin-bottom: 4px; }
+    .product-name { font-size: 14px; font-weight: 600; color: var(--gray-800); margin-bottom: 4px; line-height: 1.35; }
+    .product-shop { font-size: 11px; color: var(--gray-600); margin-bottom: 8px; }
+    .product-rating { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--gray-600); margin-bottom: 10px; }
+    .product-rating .stars { color: var(--amber); }
+    .product-footer { display: flex; align-items: center; justify-content: space-between; }
+    .product-price { font-size: 18px; font-weight: 700; color: var(--primary); font-family: var(--font-serif); }
+    .add-btn {
+      background: var(--primary); color: white; border: none;
+      padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+
+    /* Why us card */
+    .why-card {
+      background: white; border-radius: 20px; padding: 32px 24px; text-align: center;
+      box-shadow: var(--shadow-craft);
+    }
+    .why-icon {
+      width: 52px; height: 52px; border-radius: 16px; margin: 0 auto 18px;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .why-title { font-family: var(--font-serif); font-size: 18px; font-weight: 700; color: var(--gray-800); margin-bottom: 10px; }
+    .why-desc { font-size: 13px; color: var(--gray-600); line-height: 1.6; }
+
+    /* Boutique card */
+    .boutique-card {
+      border-radius: var(--radius); overflow: hidden;
+      box-shadow: var(--shadow-craft); background: white;
+      border: 1px solid var(--secondary-300);
+    }
+    .boutique-img {
+      aspect-ratio: 16/9; background: var(--secondary-300); position: relative;
+      overflow: hidden;
+    }
+    .boutique-img img { width: 100%; height: 100%; object-fit: cover; }
+    .boutique-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,.55), transparent);
+      display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
+    }
+    .boutique-name { color: white; font-weight: 700; font-size: 15px; }
+    .boutique-count { color: rgba(255,255,255,.75); font-size: 11px; }
+    .boutique-desc { padding: 12px; font-size: 12px; color: var(--gray-600); }
+
+    /* Auth forms */
+    .form-mock { padding: 32px; max-width: 380px; }
+    .form-title { font-size: 24px; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+    .form-sub { font-size: 13px; color: var(--gray-600); margin-bottom: 28px; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-800); margin-bottom: 6px; }
+    .form-input {
+      width: 100%; padding: 10px 14px; border: 1.5px solid var(--secondary-400);
+      border-radius: 10px; font-size: 14px; background: white; color: var(--gray-800);
+    }
+    .form-input:focus { outline: none; border-color: var(--primary); }
+    .form-btn {
+      width: 100%; padding: 12px; background: var(--primary); color: white;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px;
+    }
+    .form-link { font-size: 13px; color: var(--gray-600); text-align: center; margin-top: 16px; }
+    .form-link a { color: var(--primary); font-weight: 600; }
+
+    /* Dashboard KPI */
+    .kpi-card {
+      background: white; border-radius: var(--radius); padding: 20px;
+      border: 1px solid var(--secondary-300); box-shadow: var(--shadow-craft);
+    }
+    .kpi-label { font-size: 12px; color: var(--gray-600); font-weight: 500; margin-bottom: 8px; }
+    .kpi-value { font-size: 28px; font-weight: 700; color: var(--primary); font-family: var(--font-serif); }
+    .kpi-trend { font-size: 11px; color: var(--accent); margin-top: 4px; }
+
+    /* Cart drawer */
+    .drawer-mock {
+      width: 320px; background: white; padding: 24px;
+      border-left: 1px solid var(--secondary-300);
+    }
+    .drawer-title { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 20px; }
+    .cart-item {
+      display: flex; gap: 12px; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--secondary-300);
+    }
+    .cart-thumb {
+      width: 56px; height: 56px; border-radius: 8px;
+      background: var(--secondary-300); flex-shrink: 0; overflow: hidden;
+    }
+    .cart-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .cart-name { font-size: 13px; font-weight: 600; color: var(--gray-800); }
+    .cart-price { font-size: 14px; font-weight: 700; color: var(--primary); }
+    .cart-qty { font-size: 11px; color: var(--gray-600); }
+    .cart-total { display: flex; justify-content: space-between; padding: 16px 0; font-weight: 700; }
+    .cart-checkout-btn {
+      width: 100%; padding: 13px; background: var(--primary); color: white;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+
+    /* CTA banner */
+    .cta-mock {
+      background: var(--primary); padding: 48px 24px; text-align: center;
+    }
+    .cta-icon { font-size: 36px; color: var(--amber); margin-bottom: 16px; }
+    .cta-title { font-size: 32px; font-weight: 700; color: white; margin-bottom: 12px; }
+    .cta-p { font-size: 15px; color: rgba(255,255,255,.75); max-width: 460px; margin: 0 auto 24px; }
+    .cta-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: white; color: var(--primary); font-weight: 700;
+      padding: 13px 32px; border-radius: 12px; font-size: 15px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* Divider */
+    .divider { border: none; border-top: 1.5px solid var(--secondary-400); margin: 40px 0; }
+
+    /* Tags */
+    .tag {
+      display: inline-block; padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    }
+    .tag-pending  { background: #fef9c3; color: #92400e; }
+    .tag-shipped  { background: #dbeafe; color: #1e40af; }
+    .tag-delivered{ background: #dcfce7; color: #166534; }
+
+    /* Responsive */
+    @media (max-width: 700px) {
+      .grid2,.grid3,.grid4 { grid-template-columns: 1fr; }
+      .cat-grid { grid-template-columns: repeat(4,1fr); }
+      .mood-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════════════════════════════ COVER ══════════════════════════════════ -->
+  <div class="cover">
+    <div class="cover-tag">🌿 Design Document — v1.0</div>
+    <h1>Market<span>Craft</span></h1>
+    <p>Moodboard & Maquettes — Marketplace artisanale</p>
+  </div>
+
+  <!-- ══════════════════════════════ MOODBOARD ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Moodboard</div>
+    <h2 class="section-title">Identité visuelle</h2>
+    <p class="section-sub">Chaleur artisanale, matières naturelles, authenticité.</p>
+
+    <!-- Palette -->
+    <h3 style="font-size:16px;font-weight:700;color:var(--gray-800);margin-bottom:16px;">Palette de couleurs</h3>
+    <div class="palette">
+      <div class="swatch">
+        <div class="swatch-color" style="background:#8B4513;"></div>
+        <div class="swatch-name">Primary</div>
+        <div class="swatch-hex">#8B4513 — Brun selle</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#7a3c10;"></div>
+        <div class="swatch-name">Primary Dark</div>
+        <div class="swatch-hex">#7a3c10</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#fae8d8;"></div>
+        <div class="swatch-name">Primary Light</div>
+        <div class="swatch-hex">#fae8d8</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#F5F0E8;"></div>
+        <div class="swatch-name">Secondary</div>
+        <div class="swatch-hex">#F5F0E8 — Crème</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#ede4d4;"></div>
+        <div class="swatch-name">Secondary Dark</div>
+        <div class="swatch-hex">#ede4d4</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#6B7C3F;"></div>
+        <div class="swatch-name">Accent</div>
+        <div class="swatch-hex">#6B7C3F — Olive</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#e5ebd5;"></div>
+        <div class="swatch-name">Accent Light</div>
+        <div class="swatch-hex">#e5ebd5</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#fbbf24;"></div>
+        <div class="swatch-name">Amber</div>
+        <div class="swatch-hex">#fbbf24 — Dorée</div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Typographie -->
+    <h3 style="font-size:16px;font-weight:700;color:var(--gray-800);margin-bottom:20px;">Typographie</h3>
+    <div style="background:white;border-radius:16px;padding:28px;border:1px solid var(--secondary-400);box-shadow:var(--shadow-craft);">
+      <div class="typo-row">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-600);margin-bottom:6px;">Titres — Georgia (Serif)</div>
+          <div style="font-family:'Georgia',serif;font-size:36px;font-weight:700;color:var(--primary);">L'artisanat réinventé</div>
+          <div style="font-family:'Georgia',serif;font-size:24px;font-weight:700;color:var(--gray-800);">Titre de section</div>
+          <div style="font-family:'Georgia',serif;font-size:18px;font-weight:700;color:var(--gray-800);">Titre de carte</div>
+        </div>
+      </div>
+      <div class="typo-row" style="margin-top:20px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-600);margin-bottom:6px;">Corps — Inter (Sans-serif)</div>
+          <div style="font-size:16px;color:var(--gray-800);margin-bottom:4px;">Texte corps principal — Inter Regular 400</div>
+          <div style="font-size:14px;font-weight:500;color:var(--gray-800);margin-bottom:4px;">Navigation & labels — Inter Medium 500</div>
+          <div style="font-size:13px;font-weight:600;color:var(--gray-600);margin-bottom:4px;">Métadonnées & sous-titres — Inter SemiBold 600</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);">Catégories — Inter Bold 700 caps</div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Mots-clés design -->
+    <h3 style="font-size:16px;font-weight:700;color:var(--gray-800);margin-bottom:16px;">Mots-clés design</h3>
+    <div class="keyword-list">
+      <span class="keyword">🌿 Naturel</span>
+      <span class="keyword">🤎 Chaleureux</span>
+      <span class="keyword">✋ Fait main</span>
+      <span class="keyword">🪵 Texturé</span>
+      <span class="keyword">🌾 Terreux</span>
+      <span class="keyword">💛 Doré</span>
+      <span class="keyword">🍃 Organique</span>
+      <span class="keyword">🏺 Artisanal</span>
+      <span class="keyword">🔒 Fiable</span>
+      <span class="keyword">✨ Unique</span>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Composants UI -->
+    <h3 style="font-size:16px;font-weight:700;color:var(--gray-800);margin-bottom:20px;">Composants UI</h3>
+    <div style="background:white;border-radius:16px;padding:28px;border:1px solid var(--secondary-400);display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+      <button class="add-btn" style="padding:10px 20px;font-size:14px;">Bouton primaire</button>
+      <button style="padding:10px 20px;border-radius:8px;border:2px solid var(--primary);color:var(--primary);background:transparent;font-weight:600;font-size:14px;cursor:pointer;">Bouton outline</button>
+      <button style="padding:10px 20px;border-radius:8px;border:1.5px solid var(--secondary-400);color:var(--primary);background:var(--secondary-200);font-weight:600;font-size:14px;cursor:pointer;">Bouton secondaire</button>
+      <button style="padding:10px 20px;border-radius:8px;border:none;color:white;background:var(--accent);font-weight:600;font-size:14px;cursor:pointer;">Bouton accent</button>
+      <span class="tag tag-pending">En attente</span>
+      <span class="tag tag-shipped">Expédié</span>
+      <span class="tag tag-delivered">Livré</span>
+      <div class="ai-badge"><span>✦</span> Recherche IA</div>
+    </div>
+
+    <div style="margin-top:16px;background:white;border-radius:16px;padding:28px;border:1px solid var(--secondary-400);">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <input class="form-input" style="max-width:240px;" placeholder="Champ texte…" />
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--amber);font-size:18px;">★★★★</span>
+          <span style="color:var(--secondary-400);font-size:18px;">★</span>
+          <span style="font-size:13px;color:var(--gray-600);">4.0 (24 avis)</span>
+        </div>
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;font-weight:700;">A</div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Ombres & Rayons -->
+    <h3 style="font-size:16px;font-weight:700;color:var(--gray-800);margin-bottom:16px;">Effets visuels</h3>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div style="background:white;padding:20px 28px;border-radius:12px;box-shadow:var(--shadow-craft);border:1px solid var(--secondary-300);font-size:13px;color:var(--gray-600);">shadow-craft<br><span style="font-size:11px;">rgba(139,69,19,.10)</span></div>
+      <div style="background:white;padding:20px 28px;border-radius:12px;box-shadow:var(--shadow-lg);border:1px solid var(--secondary-300);font-size:13px;color:var(--gray-600);">shadow-craft-lg<br><span style="font-size:11px;">rgba(139,69,19,.15)</span></div>
+      <div style="background:white;padding:20px 28px;border-radius:8px;box-shadow:var(--shadow-craft);border:1px solid var(--secondary-300);font-size:13px;color:var(--gray-600);">radius-sm — 8px</div>
+      <div style="background:white;padding:20px 28px;border-radius:12px;box-shadow:var(--shadow-craft);border:1px solid var(--secondary-300);font-size:13px;color:var(--gray-600);">radius — 12px</div>
+      <div style="background:white;padding:20px 28px;border-radius:20px;box-shadow:var(--shadow-craft);border:1px solid var(--secondary-300);font-size:13px;color:var(--gray-600);">radius-xl — 20px</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════ MAQUETTES ══════════════════════════════════ -->
+
+  <!-- ── 1. NAVBAR ──────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Maquette 1/7</div>
+    <h2 class="section-title">Navbar</h2>
+    <p class="section-sub">Barre de navigation sticky — desktop</p>
+    <div class="mockup-frame">
+      <div class="nav-mock">
+        <div class="nav-logo">
+          <div class="nav-logo-icon">🔨</div>
+          <span class="nav-logo-text">MarketCraft</span>
+        </div>
+        <div class="nav-links">
+          <div class="nav-link active">Accueil</div>
+          <div class="nav-link">Produits</div>
+          <div class="nav-link">Boutiques</div>
+        </div>
+        <div style="position:relative;flex:1;max-width:220px;">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--gray-600);">🔍</span>
+          <div class="nav-search" style="max-width:100%;">Rechercher un produit…</div>
+        </div>
+        <div class="nav-actions">
+          <div class="ai-badge"><span>✦</span> IA</div>
+          <div class="nav-cart">
+            🛒
+            <div class="nav-cart-badge">3</div>
+          </div>
+          <button class="nav-btn nav-btn-outline">Connexion</button>
+          <button class="nav-btn nav-btn-fill">S'inscrire</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. HERO ─────────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Maquette 2/7</div>
+    <h2 class="section-title">Page d'accueil — Hero</h2>
+    <p class="section-sub">Section principale avec image de fond, headline et appels à l'action.</p>
+    <div class="mockup-frame">
+      <div class="hero-mock">
+        <div>
+          <div class="hero-tag">🌿 La marketplace des artisans du monde</div>
+          <div class="hero-h1">L'artisanat,<br><span>réinventé</span></div>
+          <div class="hero-p">Découvrez des créations uniques, fabriquées à la main par des artisans passionnés aux quatre coins du monde.</div>
+          <div class="hero-btns">
+            <div class="hero-btn-fill">Explorer les produits →</div>
+            <div class="hero-btn-glass">Devenir artisan</div>
+          </div>
+          <div class="hero-stats">
+            <div><div class="hero-stat-val">1 200+</div><div class="hero-stat-lab">Artisans</div></div>
+            <div><div class="hero-stat-val">8 500+</div><div class="hero-stat-lab">Produits</div></div>
+            <div><div class="hero-stat-val">4.9★</div><div class="hero-stat-lab">Note moyenne</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categories -->
+      <div style="background:white;padding-bottom:16px;">
+        <div style="text-align:center;padding-top:24px;padding-bottom:4px;">
+          <div style="font-family:var(--font-serif);font-size:24px;font-weight:700;color:var(--primary);">Explorez par catégorie</div>
+          <div style="font-size:13px;color:var(--gray-600);margin-top:4px;">Trouvez l'artisanat qui vous ressemble</div>
+        </div>
+        <div class="cat-grid">
+          <div class="cat-item"><div class="cat-icon" style="background:#fef3c7;color:#d97706;">💎</div><div class="cat-label">Bijoux</div></div>
+          <div class="cat-item"><div class="cat-icon" style="background:#ffedd5;color:#ea580c;">☕</div><div class="cat-label">Céramique</div></div>
+          <div class="cat-item"><div class="cat-icon" style="background:#fce7f3;color:#db2777;">👕</div><div class="cat-label">Mode</div></div>
+          <div class="cat-item"><div class="cat-icon" style="background:#dbeafe;color:#2563eb;">🏠</div><div class="cat-label">Décoration</div></div>
+          <div class="cat-item"><div class="cat-icon" style="background:#dcfce7;color:#16a34a;">🌸</div><div class="cat-label">Floral</div></div>
+          <div class="cat-item"><div class="cat-icon" style="background:#f3e8ff;color:#9333ea;">🎨</div><div class="cat-label">Art</div></div>
+          <div class="cat-item"><div class="cat-icon" style="background:#fee2e2;color:#dc2626;">✂️</div><div class="cat-label">Textile</div></div>
+          <div class="cat-item"><div class="cat-icon" style="background:#ccfbf1;color:#0d9488;">📖</div><div class="cat-label">Papeterie</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. GRILLE PRODUITS ─────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Maquette 3/7</div>
+    <h2 class="section-title">Grille Produits</h2>
+    <p class="section-sub">Affichage 4 colonnes — ProductCard avec image, note, prix et ajout au panier.</p>
+    <div class="mockup-frame" style="padding:24px;background:var(--secondary);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+        <div>
+          <div style="font-family:var(--font-serif);font-size:24px;font-weight:700;color:var(--primary);">Produits tendance</div>
+          <div style="font-size:13px;color:var(--gray-600);margin-top:2px;">Les coups de cœur de notre communauté</div>
+        </div>
+        <span style="font-size:13px;font-weight:600;color:var(--primary);">Voir tout →</span>
+      </div>
+      <div class="grid4">
+        <div class="product-card">
+          <div class="product-img"><img src="https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=70" alt="Vase" /></div>
+          <div class="product-body">
+            <div class="product-cat">Céramique</div>
+            <div class="product-name">Vase en céramique fait main</div>
+            <div class="product-shop">Céramiques de Lyon</div>
+            <div class="product-rating"><span class="stars">★★★★★</span> 4.8 (24)</div>
+            <div class="product-footer"><span class="product-price">45 €</span><button class="add-btn">+ Panier</button></div>
+          </div>
+        </div>
+        <div class="product-card">
+          <div class="product-img"><img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=70" alt="Collier" /></div>
+          <div class="product-body">
+            <div class="product-cat">Bijoux</div>
+            <div class="product-name">Collier en argent ciselé</div>
+            <div class="product-shop">Bijoux Céleste</div>
+            <div class="product-rating"><span class="stars">★★★★★</span> 4.9 (18)</div>
+            <div class="product-footer"><span class="product-price">89 €</span><button class="add-btn">+ Panier</button></div>
+          </div>
+        </div>
+        <div class="product-card">
+          <div class="product-img"><img src="https://images.unsplash.com/photo-1512572525676-f9b59951929e?w=400&q=70" alt="Bougie" /></div>
+          <div class="product-body">
+            <div class="product-cat">Bien-être</div>
+            <div class="product-name">Bougie parfumée cire d'abeille</div>
+            <div class="product-shop">Artisan du Midi</div>
+            <div class="product-rating"><span class="stars">★★★★★</span> 4.6 (41)</div>
+            <div class="product-footer"><span class="product-price">18 €</span><button class="add-btn">+ Panier</button></div>
+          </div>
+        </div>
+        <div class="product-card">
+          <div class="product-img"><img src="https://images.unsplash.com/photo-1521488741906-21a748d4d374?w=400&q=70" alt="Écharpe" /></div>
+          <div class="product-body">
+            <div class="product-cat">Textile</div>
+            <div class="product-name">Écharpe en laine mérinos</div>
+            <div class="product-shop">Maison Textile</div>
+            <div class="product-rating"><span class="stars">★★★★</span>☆ 4.4 (12)</div>
+            <div class="product-footer"><span class="product-price">65 €</span><button class="add-btn">+ Panier</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. BOUTIQUES ───────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Maquette 4/7</div>
+    <h2 class="section-title">Boutiques à la une</h2>
+    <p class="section-sub">Cards boutique avec image en aspect 16/9, gradient overlay et description.</p>
+    <div class="mockup-frame" style="padding:24px;background:white;">
+      <div class="grid4">
+        <div class="boutique-card">
+          <div class="boutique-img">
+            <img src="https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=70" alt="Céramiques" />
+            <div class="boutique-overlay">
+              <div class="boutique-name">Céramiques de Lyon</div>
+              <div class="boutique-count">24 produits</div>
+            </div>
+          </div>
+          <div class="boutique-desc">Poteries et céramiques artisanales depuis 1987.</div>
+        </div>
+        <div class="boutique-card">
+          <div class="boutique-img">
+            <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=600&q=70" alt="Bijoux" />
+            <div class="boutique-overlay">
+              <div class="boutique-name">Bijoux Céleste</div>
+              <div class="boutique-count">18 produits</div>
+            </div>
+          </div>
+          <div class="boutique-desc">Bijoux fins en argent et or, façonnés à la main.</div>
+        </div>
+        <div class="boutique-card">
+          <div class="boutique-img">
+            <img src="https://images.unsplash.com/photo-1512572525676-f9b59951929e?w=600&q=70" alt="Artisan" />
+            <div class="boutique-overlay">
+              <div class="boutique-name">Artisan du Midi</div>
+              <div class="boutique-count">31 produits</div>
+            </div>
+          </div>
+          <div class="boutique-desc">Savons, bougies et cosmétiques naturels du sud.</div>
+        </div>
+        <div class="boutique-card">
+          <div class="boutique-img">
+            <img src="https://images.unsplash.com/photo-1521488741906-21a748d4d374?w=600&q=70" alt="Textile" />
+            <div class="boutique-overlay">
+              <div class="boutique-name">Maison Textile</div>
+              <div class="boutique-count">15 produits</div>
+            </div>
+          </div>
+          <div class="boutique-desc">Linge de maison et accessoires tissés à la main.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. AUTH ─────────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Maquette 5/7</div>
+    <h2 class="section-title">Authentification</h2>
+    <p class="section-sub">Formulaires de connexion et d'inscription.</p>
+    <div class="grid2">
+      <div class="mockup-frame">
+        <div class="form-mock">
+          <div class="form-title">Connexion</div>
+          <div class="form-sub">Ravis de vous revoir sur MarketCraft</div>
+          <div class="form-group">
+            <label class="form-label">Adresse e-mail</label>
+            <input class="form-input" placeholder="vous@exemple.fr" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mot de passe</label>
+            <input class="form-input" type="password" placeholder="••••••••" />
+          </div>
+          <button class="form-btn">Se connecter</button>
+          <div class="form-link">Pas encore de compte ? <a href="#">S'inscrire</a></div>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="form-mock">
+          <div class="form-title">Créer un compte</div>
+          <div class="form-sub">Rejoignez la communauté MarketCraft</div>
+          <div class="grid2" style="gap:12px;">
+            <div class="form-group">
+              <label class="form-label">Prénom</label>
+              <input class="form-input" placeholder="Jean" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nom</label>
+              <input class="form-input" placeholder="Dupont" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">E-mail</label>
+            <input class="form-input" placeholder="vous@exemple.fr" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mot de passe</label>
+            <input class="form-input" type="password" placeholder="••••••••" />
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:8px;">
+            <div style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--primary);background:var(--primary-100);text-align:center;font-size:13px;font-weight:600;color:var(--primary);cursor:pointer;">🛍 Acheteur</div>
+            <div style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--secondary-400);text-align:center;font-size:13px;font-weight:500;color:var(--gray-600);cursor:pointer;">🏺 Vendeur</div>
+          </div>
+          <button class="form-btn">Créer mon compte</button>
+          <div class="form-link">Déjà un compte ? <a href="#">Connexion</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 6. PANIER & CHECKOUT ───────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Maquette 6/7</div>
+    <h2 class="section-title">Panier & Checkout</h2>
+    <p class="section-sub">Tiroir panier latéral et page de confirmation de commande.</p>
+    <div class="grid2">
+      <!-- Drawer -->
+      <div class="mockup-frame" style="display:flex;">
+        <div style="flex:1;background:var(--secondary);display:flex;align-items:center;justify-content:center;padding:24px;font-size:13px;color:var(--gray-600);">← Contenu de la page</div>
+        <div class="drawer-mock">
+          <div class="drawer-title">🛒 Mon panier (3)</div>
+          <div class="cart-item">
+            <div class="cart-thumb"><img src="https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=100&q=70" alt="" /></div>
+            <div style="flex:1;">
+              <div class="cart-name">Vase céramique</div>
+              <div class="cart-qty">Qté : 1</div>
+            </div>
+            <div class="cart-price">45 €</div>
+          </div>
+          <div class="cart-item">
+            <div class="cart-thumb"><img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=100&q=70" alt="" /></div>
+            <div style="flex:1;">
+              <div class="cart-name">Collier argent</div>
+              <div class="cart-qty">Qté : 2</div>
+            </div>
+            <div class="cart-price">178 €</div>
+          </div>
+          <div class="cart-item">
+            <div class="cart-thumb"><img src="https://images.unsplash.com/photo-1512572525676-f9b59951929e?w=100&q=70" alt="" /></div>
+            <div style="flex:1;">
+              <div class="cart-name">Bougie cire d'abeille</div>
+              <div class="cart-qty">Qté : 1</div>
+            </div>
+            <div class="cart-price">18 €</div>
+          </div>
+          <div class="cart-total">
+            <span>Total</span>
+            <span style="color:var(--primary);font-family:var(--font-serif);font-size:20px;">241 €</span>
+          </div>
+          <button class="cart-checkout-btn">Commander →</button>
+        </div>
+      </div>
+      <!-- Checkout form -->
+      <div class="mockup-frame">
+        <div style="padding:28px;">
+          <div style="font-family:var(--font-serif);font-size:22px;font-weight:700;color:var(--primary);margin-bottom:4px;">Finaliser ma commande</div>
+          <div style="font-size:13px;color:var(--gray-600);margin-bottom:24px;">Adresse de livraison</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div class="form-group"><label class="form-label">Prénom</label><input class="form-input" placeholder="Jean" /></div>
+            <div class="form-group"><label class="form-label">Nom</label><input class="form-input" placeholder="Dupont" /></div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;"><label class="form-label">Adresse</label><input class="form-input" placeholder="12 rue de la Paix" /></div>
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:20px;">
+            <div class="form-group"><label class="form-label">Code postal</label><input class="form-input" placeholder="75001" /></div>
+            <div class="form-group"><label class="form-label">Ville</label><input class="form-input" placeholder="Paris" /></div>
+          </div>
+          <div style="background:var(--secondary);border-radius:12px;padding:16px;margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-600);margin-bottom:6px;"><span>Sous-total</span><span>241 €</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--gray-600);margin-bottom:8px;"><span>Livraison</span><span>Gratuite</span></div>
+            <div style="display:flex;justify-content:space-between;font-weight:700;font-size:16px;color:var(--primary);"><span>Total</span><span>241 €</span></div>
+          </div>
+          <button class="form-btn">Confirmer la commande ✓</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 7. DASHBOARD VENDEUR ───────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Maquette 7/7</div>
+    <h2 class="section-title">Dashboard Vendeur</h2>
+    <p class="section-sub">Vue tableau de bord — KPIs, commandes récentes, gestion produits.</p>
+    <div class="mockup-frame" style="padding:28px;background:var(--secondary);">
+      <div style="font-family:var(--font-serif);font-size:22px;font-weight:700;color:var(--primary);margin-bottom:4px;">Bonjour, Marie 👋</div>
+      <div style="font-size:13px;color:var(--gray-600);margin-bottom:24px;">Céramiques de Lyon — Boutique active</div>
+
+      <!-- KPIs -->
+      <div class="grid4" style="margin-bottom:24px;">
+        <div class="kpi-card">
+          <div class="kpi-label">Chiffre d'affaires</div>
+          <div class="kpi-value">3 240 €</div>
+          <div class="kpi-trend">↑ +12% ce mois</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Commandes reçues</div>
+          <div class="kpi-value">47</div>
+          <div class="kpi-trend">↑ +5 cette semaine</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Note moyenne</div>
+          <div class="kpi-value">4.8 ★</div>
+          <div class="kpi-trend">Sur 24 avis</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Produits actifs</div>
+          <div class="kpi-value">24</div>
+          <div class="kpi-trend">3 en rupture de stock</div>
+        </div>
+      </div>
+
+      <!-- Commandes récentes -->
+      <div class="kpi-card">
+        <div style="font-weight:700;font-size:15px;color:var(--gray-800);margin-bottom:16px;">Commandes récentes</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="text-align:left;color:var(--gray-600);border-bottom:1px solid var(--secondary-300);">
+              <th style="padding:8px 0;">Commande</th>
+              <th style="padding:8px 0;">Client</th>
+              <th style="padding:8px 0;">Montant</th>
+              <th style="padding:8px 0;">Statut</th>
+              <th style="padding:8px 0;">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--secondary-300);">
+              <td style="padding:10px 0;">#1042</td>
+              <td style="padding:10px 0;">Sophie M.</td>
+              <td style="padding:10px 0;font-weight:700;color:var(--primary);">90 €</td>
+              <td style="padding:10px 0;"><span class="tag tag-pending">En attente</span></td>
+              <td style="padding:10px 0;color:var(--gray-600);">04/06/2026</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--secondary-300);">
+              <td style="padding:10px 0;">#1041</td>
+              <td style="padding:10px 0;">Paul D.</td>
+              <td style="padding:10px 0;font-weight:700;color:var(--primary);">45 €</td>
+              <td style="padding:10px 0;"><span class="tag tag-shipped">Expédié</span></td>
+              <td style="padding:10px 0;color:var(--gray-600);">02/06/2026</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 0;">#1038</td>
+              <td style="padding:10px 0;">Laura B.</td>
+              <td style="padding:10px 0;font-weight:700;color:var(--primary);">135 €</td>
+              <td style="padding:10px 0;"><span class="tag tag-delivered">Livré</span></td>
+              <td style="padding:10px 0;color:var(--gray-600);">28/05/2026</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CTA BANNER ─────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Composant</div>
+    <h2 class="section-title">Bannière CTA Vendeur</h2>
+    <p class="section-sub">Bannière d'appel à l'action en bas de la page d'accueil.</p>
+    <div class="mockup-frame">
+      <div class="cta-mock">
+        <div class="cta-icon">★</div>
+        <div class="cta-title">Vous êtes artisan ?</div>
+        <div class="cta-p">Rejoignez notre communauté de créateurs et vendez vos créations au monde entier. Création de boutique gratuite, commission réduite.</div>
+        <div class="cta-btn">Créer ma boutique →</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer du document -->
+  <div style="text-align:center;padding:40px 0;color:var(--gray-600);font-size:13px;border-top:1px solid var(--secondary-400);">
+    MarketCraft — Moodboard & Maquettes — Généré le 04/06/2026
+  </div>
+
+</div>
+</body>
+</html>
