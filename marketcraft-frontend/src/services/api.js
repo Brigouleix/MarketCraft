@@ -82,6 +82,7 @@ api.interceptors.response.use(
 export const authAPI = {
   login:        (credentials) => api.post('/auth/login', credentials),
   register:     (userData)    => api.post('/auth/register', userData),
+  captcha:      ()            => api.get('/auth/captcha'),
   me:           ()            => api.get('/auth/me'),
   updateMe:     (data)        => api.put('/auth/me', data),
   logout:       ()            => api.post('/auth/logout'),
@@ -124,6 +125,14 @@ export const avisAPI = {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboardAPI = {
+  getStats:    () => api.get('/dashboard/stats'),
+  activityLog: (params) => api.get('/dashboard/activity-log', { params }),
+};
+
+// ── Vendor ────────────────────────────────────────────────────────────────────
+export const vendorAPI = {
+  getOrders: (params) => api.get('/vendor/orders', { params }),
+  getProducts: (params) => api.get('/products', { params: { ...params, my: 'true' } }),
   getVendeurStats:  () => api.get('/dashboard/stats'),
   getAcheteurStats: () => api.get('/dashboard/acheteur'),
 };

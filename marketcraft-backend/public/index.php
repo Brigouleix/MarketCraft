@@ -74,10 +74,15 @@ if ($method === 'POST') {
     }
 }
 
-// Nettoyer l'URI (supprimer le query string et le prefix éventuel)
-$requestUri  = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$scriptDir   = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
-$requestUri  = '/' . ltrim(substr($requestUri, strlen($scriptDir)), '/');
+// Nettoyer l'URI (supprimer le query string et le préfixe /api)
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$scriptDir  = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+$requestUri = '/' . ltrim(substr($requestUri, strlen($scriptDir)), '/');
+
+// Supprimer le préfixe /api s'il est présent (le frontend appelle http://host/api/*)
+if (str_starts_with($requestUri, '/api/') || $requestUri === '/api') {
+    $requestUri = substr($requestUri, 4) ?: '/';
+}
 
 // Supprimer le préfixe /api si présent
 if (str_starts_with($requestUri, '/api/')) {
@@ -90,9 +95,17 @@ if (str_starts_with($requestUri, '/api/')) {
 // 5. Dispatch vers le Router
 // ---------------------------------------------------------------------------
 use App\Core\Router;
+use App\Core\Logger;
 
 $router = new Router();
 
 require_once dirname(__DIR__) . '/routes/web.php';
 
+$_requestStart = microtime(true);
+
 $router->dispatch($method, $requestUri);
+
+// Log every request after dispatch (status code is already sent)
+$statusCode  = http_response_code();
+$durationMs  = (microtime(true) - $_requestStart) * 1000;
+Logger::request($method, $requestUri, is_int($statusCode) ? $statusCode : 200, $durationMs);

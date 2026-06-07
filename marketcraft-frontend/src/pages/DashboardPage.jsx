@@ -3,31 +3,60 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3, Package, ShoppingBag, Star, Plus, Edit2, Trash2,
   TrendingUp, Store, CheckCircle, Clock, XCircle, AlertCircle,
+  ScrollText, ShieldAlert, UserCheck, UserX, ShoppingCart, Filter,
   Upload, X, Image as ImageIcon,
 } from 'lucide-react';
 import { productsAPI, ordersAPI, boutiquesAPI, dashboardAPI, uploadAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
 const TABS = [
-  { key: 'overview',  label: "Vue d'ensemble", icon: BarChart3  },
-  { key: 'products',  label: 'Mes produits',   icon: Package    },
-  { key: 'orders',    label: 'Mes commandes',  icon: ShoppingBag},
-  { key: 'boutique',  label: 'Ma boutique',    icon: Store      },
+  { key: 'overview', label: "Vue d'ensemble",    icon: BarChart3 },
+  { key: 'products', label: 'Mes produits',       icon: Package },
+  { key: 'orders',   label: 'Mes commandes',      icon: ShoppingBag },
+  { key: 'boutique', label: 'Ma boutique',         icon: Store },
+  { key: 'journal',  label: "Journal d'activités", icon: ScrollText },
 ];
 
+// ─── Order status config ──────────────────────────────────────────────────────
+
 const STATUS_CONFIG = {
-  en_attente:     { label: 'En attente',    color: 'text-amber-600 bg-amber-100',   icon: Clock        },
-  confirmee:      { label: 'Confirmée',     color: 'text-blue-600 bg-blue-100',     icon: CheckCircle  },
-  en_preparation: { label: 'En préparation',color: 'text-indigo-600 bg-indigo-100', icon: Package      },
-  expediee:       { label: 'Expédiée',      color: 'text-purple-600 bg-purple-100', icon: TrendingUp   },
-  livree:         { label: 'Livrée',        color: 'text-green-600 bg-green-100',   icon: CheckCircle  },
-  annulee:        { label: 'Annulée',       color: 'text-red-600 bg-red-100',       icon: XCircle      },
+  en_attente:     { label: 'En attente',    color: 'text-amber-600 bg-amber-100',   icon: Clock },
+  confirmee:      { label: 'Confirmée',     color: 'text-blue-600 bg-blue-100',     icon: CheckCircle },
+  en_preparation: { label: 'Préparation',   color: 'text-indigo-600 bg-indigo-100', icon: Clock },
+  expediee:       { label: 'Expédiée',      color: 'text-purple-600 bg-purple-100', icon: TrendingUp },
+  livree:         { label: 'Livrée',        color: 'text-green-600 bg-green-100',   icon: CheckCircle },
+  annulee:        { label: 'Annulée',       color: 'text-red-600 bg-red-100',       icon: XCircle },
 };
 
-// ── Composants utilitaires ───────────────────────────────────────────────────
+// ─── Activity-log config ──────────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, sub, color }) {
+const ACTIVITY_TYPES = {
+  login_success:  { label: 'Connexion',        color: 'text-green-700 bg-green-100',   icon: UserCheck },
+  login_failure:  { label: 'Échec connexion',  color: 'text-red-700 bg-red-100',       icon: UserX },
+  login_blocked:  { label: 'IP bloquée',       color: 'text-red-800 bg-red-200',       icon: ShieldAlert },
+  user_register:  { label: 'Inscription',      color: 'text-blue-700 bg-blue-100',     icon: UserCheck },
+  product_create: { label: 'Produit créé',     color: 'text-violet-700 bg-violet-100', icon: Plus },
+  product_update: { label: 'Produit modifié',  color: 'text-indigo-700 bg-indigo-100', icon: Edit2 },
+  product_delete: { label: 'Produit supprimé', color: 'text-orange-700 bg-orange-100', icon: Trash2 },
+  order_create:   { label: 'Vente',            color: 'text-teal-700 bg-teal-100',     icon: ShoppingCart },
+  order_status:   { label: 'Statut commande',  color: 'text-purple-700 bg-purple-100', icon: TrendingUp },
+  error:          { label: 'Erreur',           color: 'text-gray-700 bg-gray-200',     icon: AlertCircle },
+};
+
+const LOG_FILTERS = [
+  { key: 'all',     label: 'Tous',             types: '' },
+  { key: 'auth',    label: 'Connexions',        types: 'login_success,login_failure,login_blocked,user_register' },
+  { key: 'actions', label: 'Actions vendeur',   types: 'product_create,product_update,product_delete,order_status' },
+  { key: 'sales',   label: 'Ventes',            types: 'order_create' },
+  { key: 'errors',  label: 'Erreurs',           types: 'error' },
+];
+
+// ─── Shared components ────────────────────────────────────────────────────────
+
+function StatCard({ icon: Icon, label, value, color, suffix = '', sub }) {
   return (
     <div className="card p-5 flex items-center gap-4">
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
@@ -44,6 +73,16 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 
 function StatusBadge({ statut }) {
   const cfg = STATUS_CONFIG[statut] || { label: statut, color: 'text-gray-600 bg-gray-100', icon: AlertCircle };
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.color}`}>
+      <Icon size={11} /> {cfg.label}
+    </span>
+  );
+}
+
+function ActivityBadge({ type }) {
+  const cfg = ACTIVITY_TYPES[type] || { label: type, color: 'text-gray-600 bg-gray-100', icon: AlertCircle };
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.color}`}>
@@ -187,7 +226,6 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
     images:      product?.images      ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images) : [],
     boutique_id: product?.boutique_id || boutiqueId || '',
   });
-  const queryClient = useQueryClient();
 
   const up = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -268,12 +306,15 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
   );
 }
 
+// ─── Main page ────────────────────────────────────────────────────────────────
 // ── Page principale ──────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab]         = useState('overview');
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [logFilter, setLogFilter]         = useState('all');
+  const [logPage, setLogPage]             = useState(1);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -281,7 +322,7 @@ export default function DashboardPage() {
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const { data } = await dashboardAPI.getVendeurStats();
+      const { data } = await dashboardAPI.getStats();
       return data.data ?? data;
     },
     staleTime: 1000 * 60 * 3,
@@ -312,12 +353,26 @@ export default function DashboardPage() {
 
   const { data: boutiqueData } = useQuery({
     queryKey: ['my-boutique'],
-    queryFn: async () => {
-      const { data } = await boutiquesAPI.getAll({ my: true });
-      return data.boutique ?? data.data?.[0] ?? data[0] ?? null;
-    },
+    queryFn: async () => { const { data } = await boutiquesAPI.getAll({ my: true }); return data; },
     staleTime: 1000 * 60 * 5,
     enabled: activeTab === 'boutique',
+  });
+
+  const activeFilter = LOG_FILTERS.find((f) => f.key === logFilter) ?? LOG_FILTERS[0];
+
+  const {
+    data: journalData,
+    isLoading: journalLoading,
+    isError: journalError,
+    refetch: refetchJournal,
+  } = useQuery({
+    queryKey: ['dashboard-journal', logFilter, logPage],
+    queryFn: async () => {
+      const { data } = await dashboardAPI.activityLog({ type: activeFilter.types || undefined, page: logPage, limit: 50 });
+      return data;
+    },
+    staleTime: 1000 * 30,
+    enabled: activeTab === 'journal',
     retry: 1,
   });
 
@@ -358,6 +413,8 @@ export default function DashboardPage() {
     onError:   () => toast.error('Erreur de sauvegarde.'),
   });
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-8">
@@ -365,7 +422,7 @@ export default function DashboardPage() {
         <p className="text-gray-500">Bienvenue, {user?.prenom || user?.nom} ! Gérez votre activité.</p>
       </div>
 
-      {/* Tabs */}
+      {/* Tab bar */}
       <div className="flex gap-1 border-b border-secondary-300 mb-8 overflow-x-auto">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
@@ -626,6 +683,124 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ── Journal d'activités ─────────────────────────────────────────────── */}
+      {activeTab === 'journal' && (
+        <div className="space-y-5">
+
+          {/* Filter chips */}
+          <div className="flex flex-wrap gap-2">
+            {LOG_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => { setLogFilter(f.key); setLogPage(1); }}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                  logFilter === f.key
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-gray-600 border-secondary-300 hover:border-gray-400'
+                }`}
+              >
+                <Filter size={11} /> {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="card overflow-hidden">
+            {journalLoading ? (
+              <div className="p-6 space-y-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-8 bg-secondary-200 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : journalError ? (
+              <div className="py-14 text-center text-red-400 space-y-3 px-6">
+                <AlertCircle size={40} className="mx-auto opacity-40" />
+                <p className="text-sm font-medium">Impossible de charger le journal.</p>
+                <button onClick={() => refetchJournal()} className="btn-secondary text-xs px-4 py-2">
+                  Réessayer
+                </button>
+              </div>
+            ) : journalData?.db_available === false ? (
+              <div className="py-14 text-center space-y-3 px-6">
+                <ShieldAlert size={40} className="mx-auto text-amber-400 opacity-60" />
+                <p className="text-sm font-semibold text-amber-700">Table de journal inaccessible</p>
+                <p className="text-xs text-gray-500 max-w-md mx-auto">
+                  {journalData.message}
+                </p>
+                <p className="text-xs text-gray-400 font-mono bg-secondary-100 rounded-lg px-4 py-2 inline-block">
+                  Fichier : database/repair_journal.sql
+                </p>
+              </div>
+            ) : (journalData?.data ?? []).length === 0 ? (
+              <div className="py-14 text-center text-gray-400">
+                <ScrollText size={40} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Aucune entrée dans le journal pour ce filtre.</p>
+                <p className="text-xs mt-1 text-gray-300">Les événements apparaîtront après la première connexion ou action.</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-secondary-100">
+                      <tr className="text-left">
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Horodatage</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">Type</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">Message</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">Utilisateur</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">IP</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-secondary-100">
+                      {(journalData?.data ?? []).map((entry) => (
+                        <tr key={entry.id} className="hover:bg-secondary-50 transition-colors">
+                          <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">
+                            {new Date(entry.created_at).toLocaleString('fr-FR')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <ActivityBadge type={entry.type} />
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 max-w-xs truncate" title={entry.message}>
+                            {entry.message}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">
+                            {entry.user_id ? `#${entry.user_id}` : '–'}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                            {entry.ip_address ?? '–'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {journalData?.pagination?.total_pages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-secondary-200 bg-secondary-50">
+                    <span className="text-xs text-gray-500">
+                      {journalData.pagination.total} entrée(s) · page {logPage}/{journalData.pagination.total_pages}
+                    </span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                        disabled={logPage <= 1}
+                        className="px-3 py-1 text-xs rounded-lg border border-secondary-300 disabled:opacity-40 hover:bg-secondary-100 transition-colors">
+                        ← Précédent
+                      </button>
+                      <button onClick={() => setLogPage((p) => p + 1)}
+                        disabled={logPage >= journalData.pagination.total_pages}
+                        className="px-3 py-1 text-xs rounded-lg border border-secondary-300 disabled:opacity-40 hover:bg-secondary-100 transition-colors">
+                        Suivant →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Auth;
+use App\Core\Logger;
 use App\Models\Order;
 use App\Models\Product;
 
@@ -137,8 +138,19 @@ class OrderController extends Controller
                 'lignes'              => $lignes,
             ]);
 
+            $total = array_sum(array_map(
+                static fn($l) => $l['prix_unitaire'] * $l['quantite'],
+                $lignes
+            ));
+            Logger::activity('order_create', "New order #{$order['id']} — {$total} €", [
+                'order_id'   => $order['id'],
+                'total'      => $total,
+                'nb_articles' => count($lignes),
+            ], (int) $auth['sub']);
+
             $this->json(['success' => true, 'message' => 'Order created.', 'data' => $order], 201);
         } catch (\Throwable $e) {
+            Logger::error('Order create failed: ' . $e->getMessage());
             $this->error('Failed to create order: ' . $e->getMessage(), 500);
         }
     }
@@ -175,11 +187,18 @@ class OrderController extends Controller
             return;
         }
 
+        $previousStatut = $order['statut'];
         $updated = $this->orderModel->updateStatus(
             $id,
             $body['statut'],
             $body['numero_suivi'] ?? null
         );
+
+        Logger::activity('order_status', "Order #{$id} status: {$previousStatut} → {$body['statut']}", [
+            'order_id'    => $id,
+            'from_statut' => $previousStatut,
+            'to_statut'   => $body['statut'],
+        ], (int) $auth['sub']);
 
         $this->success($updated, 'Order status updated.');
     }

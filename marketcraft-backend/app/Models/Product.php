@@ -174,6 +174,47 @@ class Product
         return $this->findAll($page, $limit, null, null, $boutiqueId);
     }
 
+    /**
+     * Retourne tous les produits appartenant aux boutiques d'un vendeur donné.
+     */
+    public function findByVendeur(int $vendeurId, int $page = 1, int $limit = 20): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $stmt = $this->db->prepare("
+            SELECT p.*, b.nom AS boutique_nom, c.nom AS categorie_nom,
+                   COALESCE(AVG(a.note), 0) AS note_moyenne,
+                   COUNT(DISTINCT a.id) AS nb_avis
+            FROM produits p
+            JOIN boutiques b ON b.id = p.boutique_id
+            LEFT JOIN categories c ON c.id = p.categorie_id
+            LEFT JOIN avis a ON a.produit_id = p.id
+            WHERE p.est_actif = 1 AND b.vendeur_id = :vendeur_id
+            GROUP BY p.id
+            ORDER BY p.created_at DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':vendeur_id', $vendeurId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit',      $limit,     PDO::PARAM_INT);
+        $stmt->bindValue(':offset',     $offset,    PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    }
+
+    public function countByVendeur(int $vendeurId): int
+    {
+        $stmt = $this->db->prepare("
+            SELECT COUNT(p.id)
+            FROM produits p
+            JOIN boutiques b ON b.id = p.boutique_id
+            WHERE p.est_actif = 1 AND b.vendeur_id = :vendeur_id
+        ");
+        $stmt->execute([':vendeur_id' => $vendeurId]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     public function search(string $query, int $limit = 10): array
     {
         $stmt = $this->db->prepare(
