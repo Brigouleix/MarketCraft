@@ -74,10 +74,15 @@ if ($method === 'POST') {
     }
 }
 
-// Nettoyer l'URI (supprimer le query string et le prefix éventuel)
-$requestUri  = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$scriptDir   = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
-$requestUri  = '/' . ltrim(substr($requestUri, strlen($scriptDir)), '/');
+// Nettoyer l'URI (supprimer le query string et le préfixe /api)
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$scriptDir  = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+$requestUri = '/' . ltrim(substr($requestUri, strlen($scriptDir)), '/');
+
+// Supprimer le préfixe /api s'il est présent (le frontend appelle http://host/api/*)
+if (str_starts_with($requestUri, '/api/') || $requestUri === '/api') {
+    $requestUri = substr($requestUri, 4) ?: '/';
+}
 
 // ---------------------------------------------------------------------------
 // 5. Dispatch vers le Router

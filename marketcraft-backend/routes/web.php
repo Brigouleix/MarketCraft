@@ -21,11 +21,14 @@ use App\Controllers\DashboardController;
 // AUTH
 // =========================================================================
 
+// GET  /auth/captcha   – Génère un défi math signé (public)
+$router->get('/auth/captcha', [AuthController::class, 'captcha']);
+
 // POST /auth/register  – Inscription
-$router->post('/api/auth/register', [AuthController::class, 'register']);
+$router->post('/auth/register', [AuthController::class, 'register']);
 
 // POST /auth/login     – Connexion
-$router->post('/api/auth/login', [AuthController::class, 'login']);
+$router->post('/auth/login', [AuthController::class, 'login']);
 
 // GET  /auth/me        – Profil de l'utilisateur connecté
 $router->get('/auth/me', [AuthController::class, 'me'], ['auth']);
@@ -111,8 +114,11 @@ $router->delete('/avis/:id', [AvisController::class, 'destroy'], ['auth']);
 // GET /dashboard/stats   – KPIs du vendeur connecté (JWT + vendeur/admin)
 $router->get('/dashboard/stats', [DashboardController::class, 'stats'], ['auth']);
 
-// GET /vendor/orders     – Commandes liées aux boutiques du vendeur (JWT + vendeur/admin)
+// GET /vendor/orders          – Commandes liées aux boutiques du vendeur (JWT + vendeur/admin)
 $router->get('/vendor/orders', [DashboardController::class, 'vendorOrders'], ['auth']);
+
+// GET /dashboard/activity-log – Journal d'activités (JWT + vendeur/admin)
+$router->get('/dashboard/activity-log', [DashboardController::class, 'activityLog'], ['auth']);
 
 // =========================================================================
 // RECHERCHE

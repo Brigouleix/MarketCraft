@@ -3,39 +3,76 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3, Package, ShoppingBag, Star, Plus, Edit2, Trash2,
   TrendingUp, Store, CheckCircle, Clock, XCircle, AlertCircle,
+  ScrollText, ShieldAlert, UserCheck, UserX, ShoppingCart, Filter,
 } from 'lucide-react';
 import { productsAPI, ordersAPI, boutiquesAPI, dashboardAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
 const TABS = [
-  { key: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
-  { key: 'products', label: 'Mes produits', icon: Package },
-  { key: 'orders', label: 'Mes commandes', icon: ShoppingBag },
-  { key: 'boutique', label: 'Ma boutique', icon: Store },
+  { key: 'overview', label: "Vue d'ensemble",    icon: BarChart3 },
+  { key: 'products', label: 'Mes produits',       icon: Package },
+  { key: 'orders',   label: 'Mes commandes',      icon: ShoppingBag },
+  { key: 'boutique', label: 'Ma boutique',         icon: Store },
+  { key: 'journal',  label: "Journal d'activités", icon: ScrollText },
 ];
 
+// ─── Order status config ──────────────────────────────────────────────────────
+
 const STATUS_CONFIG = {
-  en_attente: { label: 'En attente', color: 'text-amber-600 bg-amber-100', icon: Clock },
-  confirmee: { label: 'Confirmée', color: 'text-blue-600 bg-blue-100', icon: CheckCircle },
-  expediee: { label: 'Expédiée', color: 'text-purple-600 bg-purple-100', icon: TrendingUp },
-  livree: { label: 'Livrée', color: 'text-green-600 bg-green-100', icon: CheckCircle },
-  annulee: { label: 'Annulée', color: 'text-red-600 bg-red-100', icon: XCircle },
+  en_attente:     { label: 'En attente',    color: 'text-amber-600 bg-amber-100',   icon: Clock },
+  confirmee:      { label: 'Confirmée',     color: 'text-blue-600 bg-blue-100',     icon: CheckCircle },
+  en_preparation: { label: 'Préparation',   color: 'text-indigo-600 bg-indigo-100', icon: Clock },
+  expediee:       { label: 'Expédiée',      color: 'text-purple-600 bg-purple-100', icon: TrendingUp },
+  livree:         { label: 'Livrée',        color: 'text-green-600 bg-green-100',   icon: CheckCircle },
+  annulee:        { label: 'Annulée',       color: 'text-red-600 bg-red-100',       icon: XCircle },
 };
+
+// ─── Activity-log config ──────────────────────────────────────────────────────
+
+const ACTIVITY_TYPES = {
+  login_success:  { label: 'Connexion',        color: 'text-green-700 bg-green-100',   icon: UserCheck },
+  login_failure:  { label: 'Échec connexion',  color: 'text-red-700 bg-red-100',       icon: UserX },
+  login_blocked:  { label: 'IP bloquée',       color: 'text-red-800 bg-red-200',       icon: ShieldAlert },
+  user_register:  { label: 'Inscription',      color: 'text-blue-700 bg-blue-100',     icon: UserCheck },
+  product_create: { label: 'Produit créé',     color: 'text-violet-700 bg-violet-100', icon: Plus },
+  product_update: { label: 'Produit modifié',  color: 'text-indigo-700 bg-indigo-100', icon: Edit2 },
+  product_delete: { label: 'Produit supprimé', color: 'text-orange-700 bg-orange-100', icon: Trash2 },
+  order_create:   { label: 'Vente',            color: 'text-teal-700 bg-teal-100',     icon: ShoppingCart },
+  order_status:   { label: 'Statut commande',  color: 'text-purple-700 bg-purple-100', icon: TrendingUp },
+  error:          { label: 'Erreur',           color: 'text-gray-700 bg-gray-200',     icon: AlertCircle },
+};
+
+const LOG_FILTERS = [
+  { key: 'all',     label: 'Tous',             types: '' },
+  { key: 'auth',    label: 'Connexions',        types: 'login_success,login_failure,login_blocked,user_register' },
+  { key: 'actions', label: 'Actions vendeur',   types: 'product_create,product_update,product_delete,order_status' },
+  { key: 'sales',   label: 'Ventes',            types: 'order_create' },
+  { key: 'errors',  label: 'Erreurs',           types: 'error' },
+];
+
+// ─── Mock fallback data ───────────────────────────────────────────────────────
 
 const MOCK_STATS = { ca: 3842.50, nb_commandes: 47, nb_produits: 18, note_moyenne: 4.7 };
 const MOCK_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
-  id: i + 1, nom: ['Vase céramique', 'Collier argent', 'Panier osier', 'Carnet cuir', 'Bougie cire', 'Savon miel'][i],
-  prix: [45, 89, 35, 28, 18, 12][i], stock: [5, 2, 0, 8, 20, 15][i],
+  id: i + 1,
+  nom: ['Vase céramique', 'Collier argent', 'Panier osier', 'Carnet cuir', 'Bougie cire', 'Savon miel'][i],
+  prix: [45, 89, 35, 28, 18, 12][i],
+  stock: [5, 2, 0, 8, 20, 15][i],
   categorie: ['ceramique', 'bijoux', 'textile', 'papeterie', 'cuisine', 'soin'][i],
 }));
 const MOCK_ORDERS = Array.from({ length: 5 }, (_, i) => ({
-  id: 1000 + i, total: [125, 45, 89, 67, 210][i],
+  id: 1000 + i,
+  total: [125, 45, 89, 67, 210][i],
   statut: ['en_attente', 'confirmee', 'expediee', 'livree', 'annulee'][i],
   created_at: new Date(Date.now() - i * 86400000 * 3).toISOString(),
   client: { nom: ['Alice M.', 'Bernard D.', 'Claire P.', 'David R.', 'Emma L.'][i] },
   nb_articles: [2, 1, 3, 1, 4][i],
 }));
+
+// ─── Shared components ────────────────────────────────────────────────────────
 
 function StatCard({ icon: Icon, label, value, color, suffix = '' }) {
   return (
@@ -61,15 +98,27 @@ function StatusBadge({ statut }) {
   );
 }
 
+function ActivityBadge({ type }) {
+  const cfg = ACTIVITY_TYPES[type] ?? { label: type, color: 'text-gray-600 bg-secondary-100', icon: AlertCircle };
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${cfg.color}`}>
+      <Icon size={11} /> {cfg.label}
+    </span>
+  );
+}
+
+// ─── Product form modal ───────────────────────────────────────────────────────
+
 function ProductForm({ product, onClose, onSaved }) {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({
-    nom: product?.nom || '',
-    prix: product?.prix || '',
-    stock: product?.stock || '',
-    categorie: product?.categorie || '',
+    nom:         product?.nom         || '',
+    prix:        product?.prix        || '',
+    stock:       product?.stock       || '',
+    categorie:   product?.categorie   || '',
     description: product?.description || '',
   });
-  const queryClient = useQueryClient();
 
   const { mutate, isPending } = useMutation({
     mutationFn: () =>
@@ -141,101 +190,111 @@ function ProductForm({ product, onClose, onSaved }) {
   );
 }
 
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab]         = useState('overview');
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [logFilter, setLogFilter]         = useState('all');
+  const [logPage, setLogPage]             = useState(1);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // ── Queries ────────────────────────────────────────────────────────────────
+
   const { data: statsData } = useQuery({
     queryKey: ['dashboard-stats'],
-    queryFn: async () => {
-      const { data } = await dashboardAPI.getStats();
-      return data;
-    },
+    queryFn: async () => { const { data } = await dashboardAPI.getStats(); return data; },
     staleTime: 1000 * 60 * 5,
   });
 
   const { data: productsData, isLoading: productsLoading } = useQuery({
     queryKey: ['my-products'],
-    queryFn: async () => {
-      const { data } = await productsAPI.getAll({ my: true });
-      return data;
-    },
+    queryFn: async () => { const { data } = await productsAPI.getAll({ my: true }); return data; },
     staleTime: 1000 * 60 * 2,
     enabled: activeTab === 'products',
   });
 
   const { data: ordersData } = useQuery({
     queryKey: ['my-orders'],
-    queryFn: async () => {
-      const { data } = await ordersAPI.getAll();
-      return data;
-    },
+    queryFn: async () => { const { data } = await ordersAPI.getAll(); return data; },
     staleTime: 1000 * 60 * 2,
     enabled: activeTab === 'orders',
   });
 
   const { data: boutiqueData } = useQuery({
     queryKey: ['my-boutique'],
-    queryFn: async () => {
-      const { data } = await boutiquesAPI.getAll({ my: true });
-      return data;
-    },
+    queryFn: async () => { const { data } = await boutiquesAPI.getAll({ my: true }); return data; },
     staleTime: 1000 * 60 * 5,
     enabled: activeTab === 'boutique',
   });
 
-  const stats = statsData || MOCK_STATS;
-  const products = productsData?.data || productsData?.products || MOCK_PRODUCTS;
-  const orders = ordersData?.data || ordersData?.orders || MOCK_ORDERS;
-  const boutique = boutiqueData?.boutique || boutiqueData?.data?.[0] || { nom: 'Ma boutique', description: '', image: '' };
+  const activeFilter = LOG_FILTERS.find((f) => f.key === logFilter) ?? LOG_FILTERS[0];
+
+  const {
+    data: journalData,
+    isLoading: journalLoading,
+    isError: journalError,
+    refetch: refetchJournal,
+  } = useQuery({
+    queryKey: ['dashboard-journal', logFilter, logPage],
+    queryFn: async () => {
+      const { data } = await dashboardAPI.activityLog({
+        type:  activeFilter.types || undefined,
+        page:  logPage,
+        limit: 50,
+      });
+      return data;
+    },
+    staleTime: 1000 * 30,
+    enabled: activeTab === 'journal',
+    retry: 1,
+  });
+
+  // ── Derived data ───────────────────────────────────────────────────────────
+
+  const stats    = statsData?.data   ?? statsData   ?? MOCK_STATS;
+  const products = productsData?.data ?? productsData?.products ?? MOCK_PRODUCTS;
+  const orders   = ordersData?.data   ?? ordersData?.orders     ?? MOCK_ORDERS;
+  const boutique = boutiqueData?.boutique ?? boutiqueData?.data?.[0] ?? { nom: 'Ma boutique', description: '', image: '' };
+
+  // ── Mutations ──────────────────────────────────────────────────────────────
 
   const deleteMutation = useMutation({
     mutationFn: (id) => productsAPI.delete(id),
-    onSuccess: () => {
-      toast.success('Produit supprimé.');
-      queryClient.invalidateQueries(['my-products']);
-    },
+    onSuccess: () => { toast.success('Produit supprimé.'); queryClient.invalidateQueries(['my-products']); },
     onError: () => toast.error('Erreur lors de la suppression.'),
   });
 
   const updateOrderStatus = useMutation({
     mutationFn: ({ id, status }) => ordersAPI.updateStatus(id, status),
-    onSuccess: () => {
-      toast.success('Statut mis à jour.');
-      queryClient.invalidateQueries(['my-orders']);
-    },
+    onSuccess: () => { toast.success('Statut mis à jour.'); queryClient.invalidateQueries(['my-orders']); },
   });
 
   const [boutiqueForm, setBoutiqueForm] = useState({
-    nom: boutique.nom || '',
-    description: boutique.description || '',
-    image: boutique.image || '',
+    nom: boutique.nom || '', description: boutique.description || '', image: boutique.image || '',
   });
 
   const saveBoutiqueMutation = useMutation({
     mutationFn: () =>
-      boutique.id
-        ? boutiquesAPI.update(boutique.id, boutiqueForm)
-        : boutiquesAPI.create(boutiqueForm),
-    onSuccess: () => {
-      toast.success('Boutique sauvegardée !');
-      queryClient.invalidateQueries(['my-boutique']);
-    },
+      boutique.id ? boutiquesAPI.update(boutique.id, boutiqueForm) : boutiquesAPI.create(boutiqueForm),
+    onSuccess: () => { toast.success('Boutique sauvegardée !'); queryClient.invalidateQueries(['my-boutique']); },
     onError: () => toast.error('Erreur de sauvegarde.'),
   });
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="section-title">Dashboard vendeur</h1>
         <p className="text-gray-500">Bienvenue, {user?.prenom || user?.nom} ! Gérez votre activité.</p>
       </div>
 
-      {/* Tabs */}
+      {/* Tab bar */}
       <div className="flex gap-1 border-b border-secondary-300 mb-8 overflow-x-auto">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
@@ -252,17 +311,16 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* ── Tab: Overview ─────────────────────────────────────────────────── */}
+      {/* ── Overview ────────────────────────────────────────────────────────── */}
       {activeTab === 'overview' && (
         <div className="space-y-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-            <StatCard icon={TrendingUp} label="Chiffre d'affaires" value={`${stats.ca?.toFixed(2) || '0.00'} €`} color="bg-green-100 text-green-600" />
+            <StatCard icon={TrendingUp} label="Chiffre d'affaires" value={`${Number(stats.ca || 0).toFixed(2)} €`} color="bg-green-100 text-green-600" />
             <StatCard icon={ShoppingBag} label="Commandes" value={stats.nb_commandes || 0} color="bg-blue-100 text-blue-600" />
             <StatCard icon={Package} label="Produits" value={stats.nb_produits || 0} color="bg-primary-100 text-primary" />
             <StatCard icon={Star} label="Note moyenne" value={Number(stats.note_moyenne || 0).toFixed(1)} suffix="★" color="bg-amber-100 text-amber-600" />
           </div>
 
-          {/* Recent orders */}
           <div className="card p-6">
             <h2 className="font-serif font-bold text-lg text-gray-800 mb-4">Dernières commandes</h2>
             <div className="overflow-x-auto">
@@ -276,11 +334,11 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-secondary-100">
-                  {MOCK_ORDERS.slice(0, 3).map((order) => (
+                  {(stats.recent_orders ?? MOCK_ORDERS.slice(0, 3)).map((order) => (
                     <tr key={order.id} className="hover:bg-secondary-50 transition-colors">
                       <td className="py-3 font-mono text-gray-600">#{order.id}</td>
-                      <td className="py-3">{order.client.nom}</td>
-                      <td className="py-3 font-semibold">{order.total.toFixed(2)} €</td>
+                      <td className="py-3">{order.client_prenom ? `${order.client_prenom} ${order.client_nom}` : order.client?.nom}</td>
+                      <td className="py-3 font-semibold">{Number(order.total).toFixed(2)} €</td>
                       <td className="py-3"><StatusBadge statut={order.statut} /></td>
                     </tr>
                   ))}
@@ -291,7 +349,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Tab: Products ─────────────────────────────────────────────────── */}
+      {/* ── Products ────────────────────────────────────────────────────────── */}
       {activeTab === 'products' && (
         <div>
           <div className="flex justify-between items-center mb-5">
@@ -349,11 +407,7 @@ export default function DashboardPage() {
                             <Edit2 size={15} />
                           </button>
                           <button
-                            onClick={() => {
-                              if (window.confirm('Supprimer ce produit ?')) {
-                                deleteMutation.mutate(product.id);
-                              }
-                            }}
+                            onClick={() => { if (window.confirm('Supprimer ce produit ?')) deleteMutation.mutate(product.id); }}
                             className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="Supprimer"
                           >
@@ -378,7 +432,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Tab: Orders ───────────────────────────────────────────────────── */}
+      {/* ── Orders ──────────────────────────────────────────────────────────── */}
       {activeTab === 'orders' && (
         <div>
           <h2 className="font-serif font-bold text-xl text-gray-800 mb-5">Mes commandes</h2>
@@ -400,9 +454,7 @@ export default function DashboardPage() {
                   <tr key={order.id} className="hover:bg-secondary-50 transition-colors">
                     <td className="px-4 py-3 font-mono text-gray-600">#{order.id}</td>
                     <td className="px-4 py-3">{order.client?.nom || '–'}</td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {new Date(order.created_at).toLocaleDateString('fr-FR')}
-                    </td>
+                    <td className="px-4 py-3 text-gray-500">{new Date(order.created_at).toLocaleDateString('fr-FR')}</td>
                     <td className="px-4 py-3 text-gray-600">{order.nb_articles || 1}</td>
                     <td className="px-4 py-3 font-semibold">{Number(order.total).toFixed(2)} €</td>
                     <td className="px-4 py-3"><StatusBadge statut={order.statut} /></td>
@@ -425,58 +477,161 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Tab: Boutique ─────────────────────────────────────────────────── */}
+      {/* ── Boutique ────────────────────────────────────────────────────────── */}
       {activeTab === 'boutique' && (
         <div className="max-w-xl">
           <h2 className="font-serif font-bold text-xl text-gray-800 mb-5">Paramètres de ma boutique</h2>
           <div className="card p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom de la boutique *</label>
-              <input
-                value={boutiqueForm.nom}
+              <input value={boutiqueForm.nom}
                 onChange={(e) => setBoutiqueForm((p) => ({ ...p, nom: e.target.value }))}
-                className="input-field"
-                placeholder="Ma superbe boutique"
-              />
+                className="input-field" placeholder="Ma superbe boutique" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-              <textarea
-                value={boutiqueForm.description}
+              <textarea value={boutiqueForm.description}
                 onChange={(e) => setBoutiqueForm((p) => ({ ...p, description: e.target.value }))}
-                rows={4}
-                className="input-field resize-none"
-                placeholder="Décrivez votre boutique, votre savoir-faire…"
-              />
+                rows={4} className="input-field resize-none"
+                placeholder="Décrivez votre boutique, votre savoir-faire…" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">URL de l'image / logo</label>
-              <input
-                value={boutiqueForm.image}
+              <input value={boutiqueForm.image}
                 onChange={(e) => setBoutiqueForm((p) => ({ ...p, image: e.target.value }))}
-                className="input-field"
-                placeholder="https://…"
-                type="url"
-              />
+                className="input-field" placeholder="https://…" type="url" />
               {boutiqueForm.image && (
-                <img
-                  src={boutiqueForm.image}
-                  alt="Aperçu"
+                <img src={boutiqueForm.image} alt="Aperçu"
                   className="mt-3 w-full h-40 object-cover rounded-xl border border-secondary-200"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               )}
             </div>
-            <button
-              onClick={() => saveBoutiqueMutation.mutate()}
+            <button onClick={() => saveBoutiqueMutation.mutate()}
               disabled={saveBoutiqueMutation.isPending || !boutiqueForm.nom.trim()}
-              className="btn-primary w-full"
-            >
+              className="btn-primary w-full">
               {saveBoutiqueMutation.isPending ? 'Sauvegarde…' : 'Enregistrer les modifications'}
             </button>
           </div>
         </div>
       )}
+
+      {/* ── Journal d'activités ─────────────────────────────────────────────── */}
+      {activeTab === 'journal' && (
+        <div className="space-y-5">
+
+          {/* Filter chips */}
+          <div className="flex flex-wrap gap-2">
+            {LOG_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => { setLogFilter(f.key); setLogPage(1); }}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                  logFilter === f.key
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-gray-600 border-secondary-300 hover:border-gray-400'
+                }`}
+              >
+                <Filter size={11} /> {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="card overflow-hidden">
+            {journalLoading ? (
+              <div className="p-6 space-y-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-8 bg-secondary-200 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : journalError ? (
+              <div className="py-14 text-center text-red-400 space-y-3 px-6">
+                <AlertCircle size={40} className="mx-auto opacity-40" />
+                <p className="text-sm font-medium">Impossible de charger le journal.</p>
+                <button onClick={() => refetchJournal()} className="btn-secondary text-xs px-4 py-2">
+                  Réessayer
+                </button>
+              </div>
+            ) : journalData?.db_available === false ? (
+              <div className="py-14 text-center space-y-3 px-6">
+                <ShieldAlert size={40} className="mx-auto text-amber-400 opacity-60" />
+                <p className="text-sm font-semibold text-amber-700">Table de journal inaccessible</p>
+                <p className="text-xs text-gray-500 max-w-md mx-auto">
+                  {journalData.message}
+                </p>
+                <p className="text-xs text-gray-400 font-mono bg-secondary-100 rounded-lg px-4 py-2 inline-block">
+                  Fichier : database/repair_journal.sql
+                </p>
+              </div>
+            ) : (journalData?.data ?? []).length === 0 ? (
+              <div className="py-14 text-center text-gray-400">
+                <ScrollText size={40} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Aucune entrée dans le journal pour ce filtre.</p>
+                <p className="text-xs mt-1 text-gray-300">Les événements apparaîtront après la première connexion ou action.</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-secondary-100">
+                      <tr className="text-left">
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Horodatage</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">Type</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">Message</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">Utilisateur</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600">IP</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-secondary-100">
+                      {(journalData?.data ?? []).map((entry) => (
+                        <tr key={entry.id} className="hover:bg-secondary-50 transition-colors">
+                          <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">
+                            {new Date(entry.created_at).toLocaleString('fr-FR')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <ActivityBadge type={entry.type} />
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 max-w-xs truncate" title={entry.message}>
+                            {entry.message}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">
+                            {entry.user_id ? `#${entry.user_id}` : '–'}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                            {entry.ip_address ?? '–'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {journalData?.pagination?.total_pages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-secondary-200 bg-secondary-50">
+                    <span className="text-xs text-gray-500">
+                      {journalData.pagination.total} entrée(s) · page {logPage}/{journalData.pagination.total_pages}
+                    </span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                        disabled={logPage <= 1}
+                        className="px-3 py-1 text-xs rounded-lg border border-secondary-300 disabled:opacity-40 hover:bg-secondary-100 transition-colors">
+                        ← Précédent
+                      </button>
+                      <button onClick={() => setLogPage((p) => p + 1)}
+                        disabled={logPage >= journalData.pagination.total_pages}
+                        className="px-3 py-1 text-xs rounded-lg border border-secondary-300 disabled:opacity-40 hover:bg-secondary-100 transition-colors">
+                        Suivant →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

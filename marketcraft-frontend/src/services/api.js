@@ -85,6 +85,7 @@ export const authAPI = {
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
   refreshToken: (refreshToken) => api.post('/auth/refresh', { refresh_token: refreshToken }),
+  captcha: () => api.get('/auth/captcha'),
 };
 
 // ── Products ─────────────────────────────────────────────────────────────────
@@ -123,7 +124,8 @@ export const avisAPI = {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboardAPI = {
-  getStats: () => api.get('/dashboard/stats'),
+  getStats:    () => api.get('/dashboard/stats'),
+  activityLog: (params) => api.get('/dashboard/activity-log', { params }),
 };
 
 // ── Vendor ────────────────────────────────────────────────────────────────────
