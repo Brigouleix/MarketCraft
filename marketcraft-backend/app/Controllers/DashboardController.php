@@ -232,4 +232,94 @@ class DashboardController extends Controller
             'categories_pref' => $categories,
         ]);
     }
+
+    // ------------------------------------------------------------------
+    // GET /dashboard/activity-log  (JWT + vendeur/admin)
+    // ------------------------------------------------------------------
+
+    public function activityLog(array $params = []): void
+    {
+        if (!Auth::hasRole('vendeur', 'admin')) {
+            $this->error('Forbidden. Vendor role required.', 403);
+            return;
+        }
+
+        $page   = max(1, (int) ($_GET['page']  ?? 1));
+        $limit  = min(100, max(1, (int) ($_GET['limit'] ?? 50)));
+        $offset = ($page - 1) * $limit;
+        $type   = trim($_GET['type'] ?? '');
+
+        // Bootstrap the table (handles missing table, ghost .frm, orphaned .ibd, etc.)
+        Logger::ensureTable($this->db);
+
+        // If the DB table cannot be set up, report it clearly to the frontend
+        if (!Logger::isDbAvailable()) {
+            $this->json([
+                'success'      => true,
+                'data'         => [],
+                'pagination'   => ['total' => 0, 'page' => 1, 'limit' => $limit, 'total_pages' => 0],
+                'db_available' => false,
+                'message'      => 'La table journal_activites est inaccessible. Exécutez database/repair_journal.sql dans phpMyAdmin pour corriger.',
+            ]);
+            return;
+        }
+
+        try {
+            // Build dynamic WHERE clause
+            $whereParts = [];
+            $bindValues = [];
+
+            if ($type !== '') {
+                $types = array_filter(array_map('trim', explode(',', $type)));
+                if (!empty($types)) {
+                    $phs = implode(',', array_fill(0, count($types), '?'));
+                    $whereParts[] = "type IN ({$phs})";
+                    foreach ($types as $t) {
+                        $bindValues[] = $t;
+                    }
+                }
+            }
+
+            $where = $whereParts ? 'WHERE ' . implode(' AND ', $whereParts) : '';
+
+            // Fetch page
+            $dataStmt = $this->db->prepare("
+                SELECT id, type, message, user_id, ip_address, context, created_at
+                FROM journal_activites
+                {$where}
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            ");
+            $dataStmt->execute([...$bindValues, $limit, $offset]);
+            $entries = $dataStmt->fetchAll();
+
+            // Decode context JSON for each entry
+            foreach ($entries as &$entry) {
+                if ($entry['context'] !== null) {
+                    $entry['context'] = json_decode($entry['context'], true);
+                }
+            }
+            unset($entry);
+
+            // Count total
+            $countStmt = $this->db->prepare("SELECT COUNT(*) FROM journal_activites {$where}");
+            $countStmt->execute($bindValues);
+            $total = (int) $countStmt->fetchColumn();
+
+            $this->json([
+                'success'      => true,
+                'data'         => $entries,
+                'pagination'   => [
+                    'total'       => $total,
+                    'page'        => $page,
+                    'limit'       => $limit,
+                    'total_pages' => (int) ceil($total / max(1, $limit)),
+                ],
+                'db_available' => true,
+            ]);
+        } catch (\Throwable $e) {
+            Logger::error('Activity log fetch error: ' . $e->getMessage());
+            $this->error('Failed to fetch activity log.', 500);
+        }
+    }
 }

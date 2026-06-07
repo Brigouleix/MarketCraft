@@ -54,28 +54,9 @@ const LOG_FILTERS = [
   { key: 'errors',  label: 'Erreurs',           types: 'error' },
 ];
 
-// ─── Mock fallback data ───────────────────────────────────────────────────────
-
-const MOCK_STATS = { ca: 3842.50, nb_commandes: 47, nb_produits: 18, note_moyenne: 4.7 };
-const MOCK_PRODUCTS = Array.from({ length: 6 }, (_, i) => ({
-  id: i + 1,
-  nom: ['Vase céramique', 'Collier argent', 'Panier osier', 'Carnet cuir', 'Bougie cire', 'Savon miel'][i],
-  prix: [45, 89, 35, 28, 18, 12][i],
-  stock: [5, 2, 0, 8, 20, 15][i],
-  categorie: ['ceramique', 'bijoux', 'textile', 'papeterie', 'cuisine', 'soin'][i],
-}));
-const MOCK_ORDERS = Array.from({ length: 5 }, (_, i) => ({
-  id: 1000 + i,
-  total: [125, 45, 89, 67, 210][i],
-  statut: ['en_attente', 'confirmee', 'expediee', 'livree', 'annulee'][i],
-  created_at: new Date(Date.now() - i * 86400000 * 3).toISOString(),
-  client: { nom: ['Alice M.', 'Bernard D.', 'Claire P.', 'David R.', 'Emma L.'][i] },
-  nb_articles: [2, 1, 3, 1, 4][i],
-}));
-
 // ─── Shared components ────────────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, color, suffix = '' }) {
+function StatCard({ icon: Icon, label, value, color, suffix = '', sub }) {
   return (
     <div className="card p-5 flex items-center gap-4">
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
@@ -92,6 +73,16 @@ function StatCard({ icon: Icon, label, value, color, suffix = '' }) {
 
 function StatusBadge({ statut }) {
   const cfg = STATUS_CONFIG[statut] || { label: statut, color: 'text-gray-600 bg-gray-100', icon: AlertCircle };
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.color}`}>
+      <Icon size={11} /> {cfg.label}
+    </span>
+  );
+}
+
+function ActivityBadge({ type }) {
+  const cfg = ACTIVITY_TYPES[type] || { label: type, color: 'text-gray-600 bg-gray-100', icon: AlertCircle };
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.color}`}>
@@ -331,7 +322,7 @@ export default function DashboardPage() {
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const { data } = await dashboardAPI.getVendeurStats();
+      const { data } = await dashboardAPI.getStats();
       return data.data ?? data;
     },
     staleTime: 1000 * 60 * 3,
@@ -377,11 +368,11 @@ export default function DashboardPage() {
   } = useQuery({
     queryKey: ['dashboard-journal', logFilter, logPage],
     queryFn: async () => {
-      const { data } = await boutiquesAPI.getAll({ my: true });
-      return data.boutique ?? data.data?.[0] ?? data[0] ?? null;
+      const { data } = await dashboardAPI.activityLog({ type: activeFilter.types || undefined, page: logPage, limit: 50 });
+      return data;
     },
-    staleTime: 1000 * 60 * 5,
-    enabled: activeTab === 'boutique',
+    staleTime: 1000 * 30,
+    enabled: activeTab === 'journal',
     retry: 1,
   });
 
@@ -413,10 +404,6 @@ export default function DashboardPage() {
   const updateOrderStatus = useMutation({
     mutationFn: ({ id, status }) => ordersAPI.updateStatus(id, status),
     onSuccess: () => { toast.success('Statut mis à jour.'); queryClient.invalidateQueries(['my-orders']); },
-  });
-
-  const [boutiqueForm, setBoutiqueForm] = useState({
-    nom: boutique.nom || '', description: boutique.description || '', image: boutique.image || '',
   });
 
   const saveBoutiqueMutation = useMutation({

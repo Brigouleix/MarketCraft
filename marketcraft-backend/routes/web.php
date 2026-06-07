@@ -118,12 +118,6 @@ $router->delete('/avis/:id', [AvisController::class, 'destroy'], ['auth']);
 // DASHBOARD VENDEUR
 // =========================================================================
 
-// GET /dashboard/stats   – KPIs du vendeur connecté (JWT + vendeur/admin)
-$router->get('/dashboard/stats', [DashboardController::class, 'stats'], ['auth']);
-
-// GET /vendor/orders          – Commandes liées aux boutiques du vendeur (JWT + vendeur/admin)
-$router->get('/vendor/orders', [DashboardController::class, 'vendorOrders'], ['auth']);
-
 // GET /dashboard/activity-log – Journal d'activités (JWT + vendeur/admin)
 $router->get('/dashboard/activity-log', [DashboardController::class, 'activityLog'], ['auth']);
 
