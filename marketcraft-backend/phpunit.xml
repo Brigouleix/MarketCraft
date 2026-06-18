@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         stopOnFailure="false">
+
+    <testsuites>
+        <testsuite name="MarketCraft Test Suite">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+
+    <php>
+        <env name="APP_ENV"    value="testing"/>
+        <env name="JWT_SECRET" value="test_secret_at_least_32_chars_long_ok"/>
+        <env name="JWT_TTL"    value="3600"/>
+        <env name="APP_URL"    value="http://localhost:8000"/>
+        <env name="DB_HOST"    value="localhost"/>
+        <env name="DB_NAME"    value="marketcraft_test"/>
+        <env name="DB_USER"    value="root"/>
+        <env name="DB_PASS"    value=""/>
+        <env name="DB_CHARSET" value="utf8mb4"/>
+    </php>
+</phpunit>
