@@ -6,6 +6,9 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Auth;
+use App\Core\Captcha;
+use App\Core\Logger;
+use App\Core\RateLimiter;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -15,6 +18,15 @@ class AuthController extends Controller
     public function __construct()
     {
         $this->userModel = new User();
+    }
+
+    // ------------------------------------------------------------------
+    // GET /auth/captcha  – Generate a math captcha challenge
+    // ------------------------------------------------------------------
+
+    public function captcha(array $params = []): void
+    {
+        $this->json(['success' => true, 'data' => Captcha::generate()]);
     }
 
     // ------------------------------------------------------------------
@@ -37,13 +49,11 @@ class AuthController extends Controller
             return;
         }
 
-        // Vérifier l'unicité de l'email
         if ($this->userModel->emailExists($body['email'])) {
             $this->error('This email address is already in use.', 409);
             return;
         }
 
-        // Rôle autorisé à l'inscription (empêcher de se créer admin)
         $role = in_array($body['role'] ?? '', ['client', 'vendeur'], true)
             ? $body['role']
             : 'client';
@@ -66,6 +76,10 @@ class AuthController extends Controller
             $accessToken  = Auth::generateToken($user);
             $refreshToken = Auth::generateRefreshToken($user);
 
+            Logger::activity('user_register', "New user registered: {$user['email']}", [
+                'role' => $user['role'],
+            ], $user['id']);
+
             $this->json([
                 'success'       => true,
                 'message'       => 'Registration successful.',
@@ -84,8 +98,37 @@ class AuthController extends Controller
 
     public function login(array $params = []): void
     {
-        $body = $this->getBody();
+        $body           = $this->getBody();
+        $ip             = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $rateLimitKey   = "login:{$ip}";
 
+        // ── 1. Rate limit check ───────────────────────────────────────
+        if (RateLimiter::isBlocked($rateLimitKey)) {
+            $remaining = RateLimiter::remainingSeconds($rateLimitKey);
+
+            Logger::activity('login_blocked', "IP temporarily blocked: {$ip}", [
+                'retry_after' => $remaining,
+            ]);
+
+            http_response_code(429);
+            echo json_encode([
+                'success'     => false,
+                'error'       => 'Trop de tentatives de connexion. Réessayez dans ' . ceil($remaining / 60) . ' min.',
+                'retry_after' => $remaining,
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        // ── 2. Captcha verification ───────────────────────────────────
+        $captchaToken  = $body['captcha_token']  ?? '';
+        $captchaAnswer = $body['captcha_answer']  ?? '';
+
+        if (!Captcha::verify((string) $captchaToken, (string) $captchaAnswer)) {
+            $this->error('Code de sécurité invalide ou expiré. Rechargez la page.', 422);
+            return;
+        }
+
+        // ── 3. Field validation ───────────────────────────────────────
         $errors = $this->validate($body, [
             'email'    => 'required|email',
             'password' => 'required',
@@ -96,17 +139,38 @@ class AuthController extends Controller
             return;
         }
 
+        // ── 4. Credential check ───────────────────────────────────────
         $user = $this->userModel->findByEmail($body['email']);
 
         if ($user === null || !$this->userModel->verifyPassword($body['password'], $user['password_hash'])) {
-            // Message générique pour éviter l'énumération d'emails
-            $this->error('Invalid email or password.', 401);
+            $attempts = RateLimiter::hit($rateLimitKey);
+
+            Logger::activity('login_failure', "Failed login attempt for: {$body['email']}", [
+                'attempts_in_window' => $attempts,
+                'ip'                 => $ip,
+            ]);
+
+            $remaining = self::MAX_ATTEMPTS - $attempts;
+            $suffix    = $remaining > 0
+                ? " ({$remaining} tentative(s) restante(s) avant blocage)"
+                : '';
+
+            $this->error('Email ou mot de passe invalide.' . $suffix, 401);
             return;
         }
 
+        // ── 5. Success ────────────────────────────────────────────────
+        RateLimiter::reset($rateLimitKey);
+
+        $userPublic = $this->userModel->toArray($user);
+        $token      = Auth::generateToken($userPublic);
         $userPublic   = $this->userModel->toArray($user);
         $accessToken  = Auth::generateToken($userPublic);
         $refreshToken = Auth::generateRefreshToken($userPublic);
+
+        Logger::activity('login_success', "User logged in: {$userPublic['email']}", [
+            'role' => $userPublic['role'],
+        ], $userPublic['id']);
 
         $this->json([
             'success'       => true,
@@ -221,7 +285,6 @@ class AuthController extends Controller
             return;
         }
 
-        // Si changement de mot de passe, l'ancien est requis
         if (!empty($body['password'])) {
             if (empty($body['current_password'])) {
                 $this->error('Current password is required to set a new one.', 422);
@@ -244,4 +307,10 @@ class AuthController extends Controller
 
         $this->success($user, 'Profile updated successfully.');
     }
+
+    // ------------------------------------------------------------------
+    // Internal
+    // ------------------------------------------------------------------
+
+    private const MAX_ATTEMPTS = 5;
 }

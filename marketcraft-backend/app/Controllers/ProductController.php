@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Auth;
+use App\Core\Logger;
 use App\Models\Product;
 use App\Models\Boutique;
 
@@ -36,11 +37,20 @@ class ProductController extends Controller
         $sort      = $this->getParam('sort', 'created_at');
         $order     = strtoupper($this->getParam('order', 'DESC'));
 
-        $items = $this->productModel->findAll(
-            $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order
-        );
+        // ?my=true → produits du vendeur connecté uniquement
+        $myOnly = in_array($this->getParam('my'), ['1', 'true'], true);
 
-        $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax);
+        if ($myOnly && Auth::hasRole('vendeur', 'admin')) {
+            $auth      = Auth::getCurrentUser();
+            $vendeurId = (int) $auth['sub'];
+            $items     = $this->productModel->findByVendeur($vendeurId, $page, $limit);
+            $total     = $this->productModel->countByVendeur($vendeurId);
+        } else {
+            $items = $this->productModel->findAll(
+                $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order
+            );
+            $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax);
+        }
 
         $this->paginated($items, $total, $page, $limit);
     }
@@ -119,8 +129,15 @@ class ProductController extends Controller
                 'est_fait_main' => (int) ($body['est_fait_main'] ?? 1),
             ]);
 
+            Logger::activity('product_create', "Product created: \"{$product['nom']}\"", [
+                'product_id'  => $product['id'],
+                'boutique_id' => $boutiqueId,
+                'prix'        => $product['prix'],
+            ], (int) $auth['sub']);
+
             $this->json(['success' => true, 'message' => 'Product created.', 'data' => $product], 201);
         } catch (\Throwable $e) {
+            Logger::error('Product create failed: ' . $e->getMessage());
             $this->error('Failed to create product: ' . $e->getMessage(), 500);
         }
     }
@@ -164,6 +181,11 @@ class ProductController extends Controller
         }
 
         $updated = $this->productModel->update($id, $body);
+
+        Logger::activity('product_update', "Product updated: \"{$updated['nom']}\"", [
+            'product_id' => $id,
+        ], (int) $auth['sub']);
+
         $this->success($updated, 'Product updated successfully.');
     }
 
@@ -189,6 +211,9 @@ class ProductController extends Controller
         }
 
         if ($this->productModel->delete($id)) {
+            Logger::activity('product_delete', "Product deleted: \"{$product['nom']}\"", [
+                'product_id' => $id,
+            ], (int) $auth['sub']);
             $this->success(null, 'Product deleted successfully.');
         } else {
             $this->error('Failed to delete product.', 500);

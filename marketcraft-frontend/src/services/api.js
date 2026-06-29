@@ -124,6 +124,14 @@ export const avisAPI = {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboardAPI = {
+  getStats:    () => api.get('/dashboard/stats'),
+  activityLog: (params) => api.get('/dashboard/activity-log', { params }),
+};
+
+// ── Vendor ────────────────────────────────────────────────────────────────────
+export const vendorAPI = {
+  getOrders: (params) => api.get('/vendor/orders', { params }),
+  getProducts: (params) => api.get('/products', { params: { ...params, my: 'true' } }),
   getVendeurStats:  () => api.get('/dashboard/stats'),
   getAcheteurStats: () => api.get('/dashboard/acheteur'),
 };

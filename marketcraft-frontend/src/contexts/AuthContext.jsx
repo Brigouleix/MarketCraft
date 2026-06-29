@@ -52,15 +52,25 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email, password, extras = {}) => {
     setLoading(true);
     try {
-      const { data } = await authAPI.login({ email, password });
+      const { data } = await authAPI.login({ email, password, ...extras });
       persistAuth(data.access_token, data.refresh_token, data.user);
       toast.success(`Bienvenue, ${data.user.prenom || data.user.nom} !`);
       return { success: true, user: data.user };
     } catch (err) {
-      const msg = err.response?.data?.message || 'Email ou mot de passe invalide.';
+      const status  = err.response?.status;
+      const errData = err.response?.data || {};
+
+      // IP rate-limited
+      if (status === 429) {
+        const msg = errData.error || 'Trop de tentatives. Réessayez plus tard.';
+        toast.error(msg);
+        return { success: false, blocked: true, retry_after: errData.retry_after || 900, error: msg };
+      }
+
+      const msg = errData.error || errData.message || 'Email ou mot de passe invalide.';
       toast.error(msg);
       return { success: false, error: msg };
     } finally {
