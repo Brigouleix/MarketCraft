@@ -16,7 +16,6 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const BoutiquePage = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const BuyerStatsPage = lazy(() => import('./pages/BuyerStatsPage'));
 
 function PageLoader() {
@@ -42,7 +41,6 @@ export default function App() {
             <Route path="/produits" element={<ProductsPage />} />
             <Route path="/produits/:id" element={<ProductDetailPage />} />
             <Route path="/boutiques/:id" element={<BoutiquePage />} />
-            <Route path="/search" element={<SearchResultsPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 

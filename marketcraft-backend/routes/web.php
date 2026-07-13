@@ -111,18 +111,6 @@ $router->post('/products/:id/avis', [AvisController::class, 'store'], ['auth']);
 $router->delete('/avis/:id', [AvisController::class, 'destroy'], ['auth']);
 
 // =========================================================================
-// RECHERCHE
-// =========================================================================
-
-use App\Controllers\SearchController;
-
-// POST /search/ai  – Recherche IA (public)
-$router->post('/search/ai', [SearchController::class, 'aiSearch']);
-
-// GET  /search     – Recherche simple (public)
-$router->get('/search', [SearchController::class, 'search']);
-
-// =========================================================================
 // DASHBOARD
 // =========================================================================
 

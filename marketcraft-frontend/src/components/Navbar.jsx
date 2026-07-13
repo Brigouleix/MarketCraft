@@ -11,11 +11,9 @@ import {
   UserCircle,
   ChevronDown,
   Hammer,
-  Sparkles,
 } from 'lucide-react';
 import { CartContext } from '../contexts/CartContext';
 import { useAuth } from '../hooks/useAuth';
-import AISearchBar from './AISearchBar';
 
 const navLinks = [
   { to: '/', label: 'Accueil', end: true },
@@ -31,7 +29,6 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [aiSearchOpen, setAiSearchOpen] = useState(false);
   const userMenuRef = useRef(null);
 
   // Close user menu on outside click
@@ -113,15 +110,6 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {/* Bouton Recherche IA (desktop uniquement) */}
-            <button
-              onClick={() => setAiSearchOpen(true)}
-              className="hidden md:flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors border border-purple-200"
-            >
-              <Sparkles size={15} />
-              <span>IA</span>
-            </button>
-
             {/* Cart */}
             <button
               onClick={() => openCart(true)}
@@ -277,9 +265,6 @@ export default function Navbar() {
         </div>
       )}
     </header>
-
-    {/* Modal de recherche IA (rendu en dehors du header pour éviter les z-index) */}
-    <AISearchBar isOpen={aiSearchOpen} onClose={() => setAiSearchOpen(false)} />
     </>
   );
 }
