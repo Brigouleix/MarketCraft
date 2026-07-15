@@ -81,10 +81,14 @@ MarketCraft/
     ├── 06_activite_vendeur.md   # Activité gestion vendeur
     ├── 07_activite_admin.md     # Activité administration
     ├── 08_merise_mcd.md         # MCD Merise
-    ├── 09_merise_mld.md         # MLD Merise + SQL DDL
+    ├── 09_merise_mld.md         # MLD Merise (schéma relationnel)
     ├── 10_architecture.md       # Architecture applicative
     ├── 11_deploiement.md        # Diagramme déploiement
-    └── 12_cas_utilisation.md    # Cas d'utilisation UML
+    ├── 12_cas_utilisation.md    # Cas d'utilisation UML
+    ├── 13_merise_mpd.md         # MPD Merise + SQL DDL
+    ├── 14_competences_CDA.docx  # Correspondance projet ↔ compétences CDA
+    ├── 15_gestion_projet.md     # Gestion de projet (Kanban, backlog, Git)
+    └── 16_comptes_rendus_reunion.md # Comptes-rendus de réunion
 ```
 
 ---
@@ -193,7 +197,7 @@ Créer un fichier `.env` à la racine de `marketcraft-backend/` en vous basant s
 | Variable | Description | Exemple |
 |----------|-------------|---------|
 | `DB_HOST` | Hôte de la base de données | `localhost` |
-| `DB_NAME` | Nom de la base de données | `marketcraft` |
+| `DB_NAME` | Nom de la base de données | `marketcraft_3eme_dev` |
 | `DB_USER` | Utilisateur MySQL | `root` |
 | `DB_PASS` | Mot de passe MySQL | `secret` |
 | `JWT_SECRET` | Clé secrète pour signer les tokens JWT | `une_chaine_aleatoire_longue` |
@@ -235,10 +239,14 @@ La documentation technique complète est disponible dans le dossier `docs/` :
 | [`06_activite_vendeur.md`](docs/06_activite_vendeur.md) | Diagramme d'activité de la gestion vendeur (produits, commandes, dashboard) |
 | [`07_activite_admin.md`](docs/07_activite_admin.md) | Diagramme d'activité des tâches d'administration (validation, arbitrage) |
 | [`08_merise_mcd.md`](docs/08_merise_mcd.md) | Modèle Conceptuel de Données (MCD) au format Merise |
-| [`09_merise_mld.md`](docs/09_merise_mld.md) | Modèle Logique de Données (MLD) Merise + DDL SQL complet |
+| [`09_merise_mld.md`](docs/09_merise_mld.md) | Modèle Logique de Données (MLD) Merise — schéma relationnel, normalisation |
 | [`10_architecture.md`](docs/10_architecture.md) | Schéma de l'architecture applicative (frontend ↔ API ↔ BDD) |
 | [`11_deploiement.md`](docs/11_deploiement.md) | Diagramme de déploiement UML (serveurs, conteneurs, réseau) |
 | [`12_cas_utilisation.md`](docs/12_cas_utilisation.md) | Diagramme de cas d'utilisation UML par rôle |
+| [`13_merise_mpd.md`](docs/13_merise_mpd.md) | Modèle Physique de Données (MPD) Merise + DDL SQL exécutable complet |
+| [`14_competences_CDA.docx`](docs/14_competences_CDA.docx) | Tableau de correspondance entre le projet et les 15 compétences du titre professionnel CDA |
+| [`15_gestion_projet.md`](docs/15_gestion_projet.md) | Méthode de travail, outillage, backlog produit et board Kanban |
+| [`16_comptes_rendus_reunion.md`](docs/16_comptes_rendus_reunion.md) | Comptes-rendus des points d'équipe, décisions et actions |
 
 ---
 

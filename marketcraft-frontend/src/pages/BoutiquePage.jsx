@@ -74,7 +74,7 @@ export default function BoutiquePage() {
   const { data: productsData, isLoading: productsLoading } = useQuery({
     queryKey: ['products', { boutique_id: id }],
     queryFn: async () => {
-      const { data } = await productsAPI.getAll({ boutique_id: id, per_page: 24 });
+      const { data } = await productsAPI.getAll({ boutique: id, limit: 24 });
       return data;
     },
     staleTime: 1000 * 60 * 2,
@@ -102,7 +102,7 @@ export default function BoutiquePage() {
       {/* Banner */}
       <div
         className="relative h-56 md:h-72 bg-cover bg-center"
-        style={{ backgroundImage: `url(${boutique.image || PLACEHOLDER_BANNER})` }}
+        style={{ backgroundImage: `url(${boutique.banniere_url || boutique.logo_url || PLACEHOLDER_BANNER})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
 
@@ -120,9 +120,9 @@ export default function BoutiquePage() {
         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
           <div className="max-w-7xl mx-auto flex items-end gap-5">
             <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-white shadow-lg overflow-hidden flex-shrink-0 border-4 border-white">
-              {boutique.image ? (
+              {boutique.logo_url ? (
                 <img
-                  src={boutique.image}
+                  src={boutique.logo_url}
                   alt={boutique.nom}
                   className="w-full h-full object-cover"
                 />

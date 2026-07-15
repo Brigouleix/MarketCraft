@@ -109,6 +109,7 @@ export const ordersAPI = {
 // ── Boutiques ─────────────────────────────────────────────────────────────────
 export const boutiquesAPI = {
   getAll: (params) => api.get('/boutiques', { params }),
+  getMine: () => api.get('/boutiques/me'),
   getById: (id) => api.get(`/boutiques/${id}`),
   create: (data) => api.post('/boutiques', data),
   update: (id, data) => api.put(`/boutiques/${id}`, data),

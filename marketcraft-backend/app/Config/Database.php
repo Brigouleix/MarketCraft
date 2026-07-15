@@ -15,7 +15,7 @@ class Database
     private function __construct()
     {
         $host    = $_ENV['DB_HOST']    ?? getenv('DB_HOST')    ?: 'localhost';
-        $name    = $_ENV['DB_NAME']    ?? getenv('DB_NAME')    ?: 'marketcraft';
+        $name    = $_ENV['DB_NAME']    ?? getenv('DB_NAME')    ?: 'marketcraft_3eme_dev';
         $user    = $_ENV['DB_USER']    ?? getenv('DB_USER')    ?: 'root';
         $pass    = $_ENV['DB_PASS']    ?? getenv('DB_PASS')    ?: '';
         $charset = $_ENV['DB_CHARSET'] ?? getenv('DB_CHARSET') ?: 'utf8mb4';

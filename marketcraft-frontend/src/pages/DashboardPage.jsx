@@ -288,14 +288,24 @@ export default function DashboardPage() {
     retry: 1,
   });
 
-  const { data: productsData, isLoading: productsLoading } = useQuery({
-    queryKey: ['my-products'],
+  const { data: boutiqueData } = useQuery({
+    queryKey: ['my-boutique'],
     queryFn: async () => {
-      const { data } = await productsAPI.getAll({ my: true });
+      const { data } = await boutiquesAPI.getMine();
+      return data.data ?? null;
+    },
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
+
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ['my-products', boutiqueData?.id],
+    queryFn: async () => {
+      const { data } = await productsAPI.getAll({ boutique: boutiqueData.id, limit: 100 });
       return data.data ?? data.products ?? data;
     },
     staleTime: 1000 * 60 * 2,
-    enabled: activeTab === 'products',
+    enabled: activeTab === 'products' && Boolean(boutiqueData?.id),
     retry: 1,
   });
 
@@ -310,32 +320,22 @@ export default function DashboardPage() {
     retry: 1,
   });
 
-  const { data: boutiqueData } = useQuery({
-    queryKey: ['my-boutique'],
-    queryFn: async () => {
-      const { data } = await boutiquesAPI.getAll({ my: true });
-      return data.boutique ?? data.data?.[0] ?? data[0] ?? null;
-    },
-    staleTime: 1000 * 60 * 5,
-    enabled: activeTab === 'boutique',
-    retry: 1,
-  });
-
   const stats    = statsData    || {};
   const products = Array.isArray(productsData) ? productsData : [];
   const orders   = Array.isArray(ordersData)   ? ordersData   : [];
   const boutique = boutiqueData || {};
 
-  const [boutiqueForm, setBoutiqueForm] = useState({ nom: '', description: '', image: '' });
+  const [boutiqueForm, setBoutiqueForm] = useState({ nom: '', description: '', logo_url: '', banniere_url: '' });
   const bUp = (k) => (v) => setBoutiqueForm((f) => ({ ...f, [k]: v }));
 
   // Sync boutiqueForm quand boutiqueData arrive
   React.useEffect(() => {
     if (boutiqueData) {
       setBoutiqueForm({
-        nom:         boutiqueData.nom         || '',
-        description: boutiqueData.description || '',
-        image:       boutiqueData.image        || '',
+        nom:          boutiqueData.nom          || '',
+        description:  boutiqueData.description  || '',
+        logo_url:     boutiqueData.logo_url     || '',
+        banniere_url: boutiqueData.banniere_url || '',
       });
     }
   }, [boutiqueData]);
@@ -450,7 +450,17 @@ export default function DashboardPage() {
       )}
 
       {/* ── Products ─────────────────────────────────────────────────────── */}
-      {activeTab === 'products' && (
+      {activeTab === 'products' && !boutique?.id ? (
+        <div className="card p-12 text-center">
+          <Store size={40} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-500 mb-4">
+            Crée d'abord ta boutique pour pouvoir ajouter des produits.
+          </p>
+          <button onClick={() => setActiveTab('boutique')} className="btn-primary">
+            Créer ma boutique
+          </button>
+        </div>
+      ) : activeTab === 'products' && (
         <div>
           <div className="flex justify-between items-center mb-5">
             <h2 className="font-serif font-bold text-xl text-gray-800">Mes produits</h2>
@@ -616,7 +626,10 @@ export default function DashboardPage() {
                 placeholder="Décrivez votre boutique, votre savoir-faire…" />
             </div>
 
-            <ImageUploader value={boutiqueForm.image} onChange={bUp('image')} label="Logo / image de la boutique" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <ImageUploader value={boutiqueForm.logo_url} onChange={bUp('logo_url')} label="Logo de la boutique" />
+              <ImageUploader value={boutiqueForm.banniere_url} onChange={bUp('banniere_url')} label="Bannière de la boutique" />
+            </div>
 
             <button onClick={() => saveBoutiqueMutation.mutate()}
               disabled={saveBoutiqueMutation.isPending || !boutiqueForm.nom.trim()}

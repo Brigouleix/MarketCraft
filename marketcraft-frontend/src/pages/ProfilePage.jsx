@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -62,6 +62,18 @@ export default function ProfilePage() {
   });
   const [errors, setErrors] = useState({});
   const [activeTab, setActiveTab] = useState('infos');
+
+  // Resynchronise le formulaire dès que les infos utilisateur arrivent ou
+  // changent (ex. chargement asynchrone via /me après un rafraîchissement
+  // de page), sans écraser une saisie en cours par l'utilisateur.
+  useEffect(() => {
+    if (!user) return;
+    setForm({
+      prenom: user.prenom || '',
+      nom: user.nom || '',
+      email: user.email || '',
+    });
+  }, [user]);
 
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ['my-orders'],

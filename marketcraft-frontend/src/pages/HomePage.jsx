@@ -80,7 +80,7 @@ function BoutiqueCard({ boutique }) {
     >
       <div className="relative overflow-hidden aspect-video">
         <img
-          src={boutique.image || PLACEHOLDER}
+          src={boutique.banniere_url || boutique.logo_url || PLACEHOLDER}
           alt={boutique.nom}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
@@ -113,9 +113,9 @@ export default function HomePage() {
   });
 
   const { data: boutiquesData } = useQuery({
-    queryKey: ['boutiques', { page: 1, per_page: 4 }],
+    queryKey: ['boutiques', { page: 1, limit: 4 }],
     queryFn: async () => {
-      const { data } = await boutiquesAPI.getAll({ page: 1, per_page: 4 });
+      const { data } = await boutiquesAPI.getAll({ page: 1, limit: 4 });
       return data;
     },
     staleTime: 1000 * 60 * 5,

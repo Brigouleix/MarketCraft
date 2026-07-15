@@ -66,6 +66,10 @@ $router->delete('/products/:id', [ProductController::class, 'destroy'], ['auth']
 // GET    /boutiques        – Liste des boutiques actives
 $router->get('/boutiques', [BoutiqueController::class, 'index']);
 
+// GET    /boutiques/me     – Boutique du vendeur connecté (JWT)
+// Doit être déclarée AVANT /boutiques/:id, sinon "me" est capturé comme :id.
+$router->get('/boutiques/me', [BoutiqueController::class, 'me'], ['auth']);
+
 // GET    /boutiques/:id    – Détail avec produits
 $router->get('/boutiques/:id', [BoutiqueController::class, 'show']);
 
