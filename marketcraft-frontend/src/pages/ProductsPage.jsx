@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
+import { useCategories } from '../hooks/useCategories';
 import ProductCard from '../components/ProductCard';
 
+// Secours si l'API catégories est indisponible (et pour les produits mock)
 const CATEGORIES = [
   'bijoux', 'ceramique', 'mode', 'decoration', 'floral', 'art', 'textile', 'papeterie', 'cuisine', 'autre',
 ];
@@ -65,6 +67,12 @@ export default function ProductsPage() {
 
   const { data, isLoading, isError } = useProducts(filters);
 
+  // Catégories réelles (même source que le formulaire produit du dashboard)
+  const { data: categoriesData } = useCategories();
+  const categories = categoriesData?.length
+    ? categoriesData
+    : CATEGORIES.map((slug) => ({ id: slug, nom: slug, slug }));
+
   // Use mock data when API is unavailable
   const mockProducts = Array.from({ length: 12 }, (_, i) => ({
     id: i + 1,
@@ -79,8 +87,8 @@ export default function ProductsPage() {
   }));
 
   const products = data?.data || data?.products || (isLoading ? [] : mockProducts);
-  const totalPages = data?.last_page || data?.meta?.last_page || 1;
-  const totalItems = data?.total || data?.meta?.total || mockProducts.length;
+  const totalPages = data?.pagination?.total_pages || data?.last_page || data?.meta?.last_page || 1;
+  const totalItems = data?.pagination?.total ?? data?.total ?? data?.meta?.total ?? mockProducts.length;
 
   const updateFilter = (key, value) => {
     const newParams = new URLSearchParams(searchParams);
@@ -129,17 +137,17 @@ export default function ProductsPage() {
             />
             <span className="text-sm text-gray-700">Toutes</span>
           </label>
-          {CATEGORIES.map((cat) => (
-            <label key={cat} className="flex items-center gap-2 cursor-pointer">
+          {categories.map((cat) => (
+            <label key={cat.slug} className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 name="categorie"
-                value={cat}
-                checked={filters.categorie === cat}
-                onChange={() => updateFilter('categorie', cat)}
+                value={cat.slug}
+                checked={filters.categorie === cat.slug}
+                onChange={() => updateFilter('categorie', cat.slug)}
                 className="text-primary"
               />
-              <span className="text-sm text-gray-700 capitalize">{cat}</span>
+              <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
             </label>
           ))}
         </div>

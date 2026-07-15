@@ -128,7 +128,7 @@ export default function HomePage() {
     prix: [45, 89, 35, 28, 18, 12, 65, 32][i],
     note_moyenne: [4.8, 4.9, 4.5, 4.7, 4.6, 4.9, 4.4, 4.8][i],
     nb_avis: [24, 18, 32, 15, 41, 55, 12, 28][i],
-    stock: 10,
+    stock: [10, 5, 0, 8, 20, 0, 3, 12][i],
     categorie: categories[i % categories.length].label,
     boutique: { id: (i % 3) + 1, nom: ['Céramiques de Lyon', 'Bijoux Céleste', 'Artisan du Midi'][i % 3] },
     image: [

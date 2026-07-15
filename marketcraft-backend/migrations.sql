@@ -234,6 +234,14 @@ CREATE TABLE IF NOT EXISTS `avis` (
 --  du code PHP applicatif.
 -- =============================================================
 
+-- Permet de rejouer le script sur une base existante sans erreur #1359
+DROP TRIGGER IF EXISTS `trg_avis_after_insert`;
+DROP TRIGGER IF EXISTS `trg_avis_after_update`;
+DROP TRIGGER IF EXISTS `trg_avis_after_delete`;
+DROP TRIGGER IF EXISTS `trg_produits_after_update_note`;
+DROP FUNCTION IF EXISTS `fn_stock_suffisant`;
+DROP PROCEDURE IF EXISTS `sp_liberer_paiements_echus`;
+
 DELIMITER $$
 
 -- -------------------------------------------------------------
@@ -356,11 +364,11 @@ DO CALL `sp_liberer_paiements_echus`();
 
 -- Utilisateurs (passwords = "password123" hashé avec bcrypt)
 INSERT INTO `utilisateurs` (`nom`, `prenom`, `email`, `password_hash`, `role`) VALUES
-  ('Dupont',   'Marie',   'marie.dupont@example.com',   '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin'),
-  ('Martin',   'Paul',    'paul.martin@example.com',    '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'vendeur'),
-  ('Bernard',  'Sophie',  'sophie.bernard@example.com', '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'vendeur'),
-  ('Lemoine',  'Jules',   'jules.lemoine@example.com',  '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client'),
-  ('Petit',    'Camille', 'camille.petit@example.com',  '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client');
+  ('Dupont',   'Marie',   'marie.dupont@example.com',   '$2y$12$0PlnyDgFjA7miP3uMXcCkeaemeKbJMk8hjuTsKqyhOFvbNJpOtzDe', 'admin'),
+  ('Martin',   'Paul',    'paul.martin@example.com',    '$2y$12$0PlnyDgFjA7miP3uMXcCkeaemeKbJMk8hjuTsKqyhOFvbNJpOtzDe', 'vendeur'),
+  ('Bernard',  'Sophie',  'sophie.bernard@example.com', '$2y$12$0PlnyDgFjA7miP3uMXcCkeaemeKbJMk8hjuTsKqyhOFvbNJpOtzDe', 'vendeur'),
+  ('Lemoine',  'Jules',   'jules.lemoine@example.com',  '$2y$12$0PlnyDgFjA7miP3uMXcCkeaemeKbJMk8hjuTsKqyhOFvbNJpOtzDe', 'client'),
+  ('Petit',    'Camille', 'camille.petit@example.com',  '$2y$12$0PlnyDgFjA7miP3uMXcCkeaemeKbJMk8hjuTsKqyhOFvbNJpOtzDe', 'client');
 
 -- Adresses
 INSERT INTO `adresses_livraison` (`utilisateur_id`, `nom_complet`, `ligne1`, `ville`, `code_postal`, `pays`, `est_principale`) VALUES
@@ -383,7 +391,7 @@ INSERT INTO `categories` (`nom`, `slug`, `description`, `ordre`) VALUES
 -- Produits
 INSERT INTO `produits` (`boutique_id`, `categorie_id`, `nom`, `slug`, `description`, `prix`, `stock`, `images`) VALUES
   (1, 1, 'Bol en noyer ciré',        'bol-noyer-cire',        'Bol tournée à la main en noyer massif, finition cire d\'abeille naturelle. Diamètre 20 cm.',          45.00, 12, '["bol-noyer-1.jpg","bol-noyer-2.jpg"]'),
-  (1, 1, 'Planche à découper chêne', 'planche-decoupe-chene', 'Planche à découper en chêne massif avec poignée sculptée. 35×25 cm, épaisseur 3 cm.',               65.00,  8, '["planche-1.jpg"]'),
+  (1, 1, 'Planche à découper chêne', 'planche-decoupe-chene', 'Planche à découper en chêne massif avec poignée sculptée. 35×25 cm, épaisseur 3 cm.',               65.00,  0, '["planche-1.jpg"]'),
   (1, 5, 'Cadre photo rustique',     'cadre-photo-rustique',  'Cadre photo en bois flotté récupéré, format 15×20 cm. Finition naturelle.',                            28.00, 20, '["cadre-1.jpg","cadre-2.jpg"]'),
   (2, 2, 'Mug grès bleu océan',      'mug-gres-bleu-ocean',   'Mug en grès émaillé à la main, nuances de bleu. Contenance 350 ml. Passe au lave-vaisselle.',          38.00, 15, '["mug-bleu-1.jpg"]'),
   (2, 2, 'Vase effilé terracotta',   'vase-effile-terracotta','Vase effilé en terracotta non émaillée, hauteur 30 cm. Idéal pour fleurs séchées.',                    55.00,  6, '["vase-terra-1.jpg","vase-terra-2.jpg"]'),

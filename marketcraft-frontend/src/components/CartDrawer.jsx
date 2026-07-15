@@ -116,7 +116,8 @@ export default function CartDrawer() {
                                   </span>
                                   <button
                                     onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                    className="w-7 h-7 flex items-center justify-center rounded-full border border-secondary-400 hover:bg-secondary-300 transition-colors"
+                                    disabled={item.stock !== undefined && item.quantity >= item.stock}
+                                    className="w-7 h-7 flex items-center justify-center rounded-full border border-secondary-400 hover:bg-secondary-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                   >
                                     <Plus size={12} />
                                   </button>

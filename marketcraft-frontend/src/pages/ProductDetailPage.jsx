@@ -10,6 +10,7 @@ import { CartContext } from '../contexts/CartContext';
 import { useAuth } from '../hooks/useAuth';
 import StarRating from '../components/StarRating';
 import ProductCard from '../components/ProductCard';
+import { parseImages } from '../utils/parseImages';
 import toast from 'react-hot-toast';
 
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&q=80';
@@ -37,6 +38,15 @@ Parfait pour sublimer votre intérieur avec une touche d'authenticité.`,
   ],
   boutique: { id: 1, nom: 'Céramiques de Lyon', description: 'Poteries artisanales depuis 1987.' },
 };
+
+// Nom d'affichage d'un avis : "Prénom N." — l'API renvoie auteur_prenom/auteur_nom
+// à plat, les mocks un objet utilisateur imbriqué.
+function avisAuthorName(a) {
+  const prenom = a.auteur_prenom || a.utilisateur?.prenom;
+  const nom = a.auteur_nom || a.utilisateur?.nom;
+  if (prenom) return nom ? `${prenom} ${nom.charAt(0).toUpperCase()}.` : prenom;
+  return nom || 'Anonyme';
+}
 
 const MOCK_AVIS = [
   { id: 1, note: 5, commentaire: 'Magnifique vase, exactement comme sur les photos. La qualité est au rendez-vous !', utilisateur: { nom: 'Sophie M.' }, created_at: '2026-03-15' },
@@ -115,7 +125,8 @@ export default function ProductDetailPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const product = productData?.product || productData || MOCK_PRODUCT;
+  // L'API renvoie { success, message, data: {...} } — le produit est dans data
+  const product = productData?.data ?? productData?.product ?? MOCK_PRODUCT;
 
   const { data: avisData } = useQuery({
     queryKey: ['avis', id],
@@ -155,7 +166,8 @@ export default function ProductDetailPage() {
     );
   }
 
-  const images = product.images?.length ? product.images : [product.image || PLACEHOLDER];
+  const parsedImages = parseImages(product.images);
+  const images = parsedImages.length ? parsedImages : [product.image || PLACEHOLDER];
   const inStock = (product.stock || 0) > 0;
 
   const handleAddToCart = () => {
@@ -364,7 +376,7 @@ export default function ProductDetailPage() {
                 <div key={a.id} className="card p-5">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <p className="font-semibold text-gray-800 text-sm">{a.utilisateur?.nom || 'Anonyme'}</p>
+                      <p className="font-semibold text-gray-800 text-sm">{avisAuthorName(a)}</p>
                       <StarRating value={a.note} size={14} className="mt-0.5" />
                     </div>
                     <span className="text-xs text-gray-400">

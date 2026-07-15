@@ -1,16 +1,28 @@
 import axios from 'axios';
 import { authAPI, productsAPI, ordersAPI, dashboardAPI } from '../services/api';
 
-jest.mock('axios');
+// Le mock doit fournir create() et interceptors dès l'import de services/api.js,
+// qui construit son instance au chargement du module (avant tout beforeEach).
+jest.mock('axios', () => {
+  const mock = {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn(),
+    defaults: { headers: { common: {} } },
+    interceptors: {
+      request:  { use: jest.fn() },
+      response: { use: jest.fn() },
+    },
+  };
+  mock.create = jest.fn(() => mock);
+  return mock;
+});
 
 // Simule un token en localStorage
 beforeEach(() => {
   localStorage.setItem('mc_token', 'fake-jwt-token');
-  axios.create.mockReturnValue(axios);
-  axios.interceptors = {
-    request:  { use: jest.fn() },
-    response: { use: jest.fn() },
-  };
 });
 
 afterEach(() => {

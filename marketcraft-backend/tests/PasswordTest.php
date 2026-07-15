@@ -32,10 +32,17 @@ class PasswordTest extends TestCase
 
     public function test_hash_du_fichier_migrations_correspond_a_password(): void
     {
-        // Le hash utilisé dans migrations.sql correspond à "password" (sans "123")
-        $hashMigration = '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+        // Lit le hash directement dans migrations.sql : il doit correspondre
+        // au mot de passe annoncé dans le commentaire du seed ("password123").
+        $sql = file_get_contents(__DIR__ . '/../migrations.sql');
+        $this->assertNotFalse($sql);
 
-        $this->assertTrue(password_verify('password', $hashMigration));
-        $this->assertFalse(password_verify('password123', $hashMigration));
+        preg_match('/\$2y\$\d{2}\$[.\/A-Za-z0-9]{53}/', $sql, $matches);
+        $this->assertNotEmpty($matches, 'Aucun hash bcrypt trouvé dans migrations.sql');
+
+        $hashMigration = $matches[0];
+
+        $this->assertTrue(password_verify('password123', $hashMigration));
+        $this->assertFalse(password_verify('password', $hashMigration));
     }
 }

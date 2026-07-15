@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ShoppingCart, Store } from 'lucide-react';
 import { CartContext } from '../contexts/CartContext';
 import StarRating from './StarRating';
+import { parseImages } from '../utils/parseImages';
 
 const PLACEHOLDER_IMG =
   'https://images.unsplash.com/photo-1493106641515-6b5631de4bb9?w=400&q=80';
@@ -23,7 +24,7 @@ export default function ProductCard({ product }) {
     categorie,
   } = product;
 
-  const imageUrl = image || (images && images[0]) || PLACEHOLDER_IMG;
+  const imageUrl = image || parseImages(images)[0] || PLACEHOLDER_IMG;
   const inStock = stock > 0;
 
   const handleAddToCart = (e) => {

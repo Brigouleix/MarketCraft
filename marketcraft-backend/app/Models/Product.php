@@ -23,64 +23,46 @@ class Product
     /**
      * Retourne les produits actifs avec pagination et filtres optionnels.
      *
-     * @param int         $page
-     * @param int         $limit
-     * @param string|null $search     Recherche FULLTEXT sur nom + description
-     * @param int|null    $categorieId
-     * @param int|null    $boutiqueId
-     * @param float|null  $prixMin
-     * @param float|null  $prixMax
-     * @param string      $sort       Colonne de tri
-     * @param string      $order      ASC ou DESC
+     * @param int             $page
+     * @param int             $limit
+     * @param string|null     $search    Recherche sur nom + description
+     * @param int|string|null $categorie Id numérique ou slug (préfixe accepté : 'ceramique' matche 'ceramique-poterie')
+     * @param int|null        $boutiqueId
+     * @param float|null      $prixMin
+     * @param float|null      $prixMax
+     * @param string          $sort      Colonne de tri
+     * @param string          $order     ASC ou DESC
+     * @param float|null      $noteMin   Note moyenne minimale (1 à 5)
      */
     public function findAll(
-        int     $page        = 1,
-        int     $limit       = 20,
-        ?string $search      = null,
-        ?int    $categorieId = null,
-        ?int    $boutiqueId  = null,
-        ?float  $prixMin     = null,
-        ?float  $prixMax     = null,
-        string  $sort        = 'created_at',
-        string  $order       = 'DESC'
+        int             $page       = 1,
+        int             $limit      = 20,
+        ?string         $search     = null,
+        int|string|null $categorie  = null,
+        ?int            $boutiqueId = null,
+        ?float          $prixMin    = null,
+        ?float          $prixMax    = null,
+        string          $sort       = 'created_at',
+        string          $order      = 'DESC',
+        ?float          $noteMin    = null
     ): array {
         $offset = ($page - 1) * $limit;
-        $where  = ['p.est_actif = 1'];
-        $params = [];
 
-        if (!empty($search)) {
-            $where[]          = '(p.nom LIKE :search OR p.description LIKE :search2)';
-            $params[':search']  = '%' . $search . '%';
-            $params[':search2'] = '%' . $search . '%';
-        }
+        [$whereClause, $having, $params] = $this->buildFilters(
+            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin
+        );
 
-        if ($categorieId !== null) {
-            $where[]              = 'p.categorie_id = :cat_id';
-            $params[':cat_id']    = $categorieId;
-        }
-
-        if ($boutiqueId !== null) {
-            $where[]              = 'p.boutique_id = :bout_id';
-            $params[':bout_id']   = $boutiqueId;
-        }
-
-        if ($prixMin !== null) {
-            $where[]              = 'p.prix >= :prix_min';
-            $params[':prix_min']  = $prixMin;
-        }
-
-        if ($prixMax !== null) {
-            $where[]              = 'p.prix <= :prix_max';
-            $params[':prix_max']  = $prixMax;
-        }
-
-        // Whitelist des colonnes de tri
-        $allowedSort  = ['created_at', 'prix', 'nom', 'stock'];
-        $allowedOrder = ['ASC', 'DESC'];
-        $sortCol  = in_array($sort, $allowedSort, true)   ? $sort  : 'created_at';
-        $orderDir = in_array(strtoupper($order), $allowedOrder, true) ? strtoupper($order) : 'DESC';
-
-        $whereClause = implode(' AND ', $where);
+        // Whitelist des colonnes de tri (colonnes brutes ou agrégats calculés)
+        $sortMap = [
+            'created_at' => 'p.created_at',
+            'prix'       => 'p.prix',
+            'nom'        => 'p.nom',
+            'stock'      => 'p.stock',
+            'note'       => 'note_moyenne',
+            'nb_avis'    => 'nb_avis',
+        ];
+        $sortCol  = $sortMap[$sort] ?? 'p.created_at';
+        $orderDir = in_array(strtoupper($order), ['ASC', 'DESC'], true) ? strtoupper($order) : 'DESC';
 
         $sql = "SELECT p.*, b.nom AS boutique_nom, c.nom AS categorie_nom,
                        COALESCE(AVG(a.note), 0) AS note_moyenne,
@@ -91,7 +73,8 @@ class Product
                 LEFT JOIN avis a ON a.produit_id = p.id
                 WHERE {$whereClause}
                 GROUP BY p.id
-                ORDER BY p.{$sortCol} {$orderDir}
+                {$having}
+                ORDER BY {$sortCol} {$orderDir}
                 LIMIT :limit OFFSET :offset";
 
         $stmt = $this->db->prepare($sql);
@@ -103,49 +86,122 @@ class Product
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll();
+        return array_map([$this, 'hydrate'], $stmt->fetchAll());
+    }
+
+    /**
+     * Normalise une ligne produit pour les clients de l'API :
+     * décode les colonnes JSON et expose les alias attendus par le front
+     * (objet boutique imbriqué, nom de catégorie).
+     */
+    private function hydrate(array $row): array
+    {
+        foreach (['images', 'tags'] as $col) {
+            if (isset($row[$col]) && is_string($row[$col])) {
+                $row[$col] = json_decode($row[$col], true) ?? [];
+            }
+        }
+
+        if (!empty($row['boutique_nom'])) {
+            $row['boutique'] = [
+                'id'  => (int) ($row['boutique_id'] ?? 0),
+                'nom' => $row['boutique_nom'],
+            ];
+        }
+
+        if (!isset($row['categorie']) && !empty($row['categorie_nom'])) {
+            $row['categorie'] = $row['categorie_nom'];
+        }
+
+        return $row;
     }
 
     /**
      * Compte les produits correspondant aux filtres (pour la pagination).
      */
     public function countAll(
-        ?string $search      = null,
-        ?int    $categorieId = null,
-        ?int    $boutiqueId  = null,
-        ?float  $prixMin     = null,
-        ?float  $prixMax     = null
+        ?string         $search     = null,
+        int|string|null $categorie  = null,
+        ?int            $boutiqueId = null,
+        ?float          $prixMin    = null,
+        ?float          $prixMax    = null,
+        ?float          $noteMin    = null
     ): int {
-        $where  = ['est_actif = 1'];
-        $params = [];
+        [$whereClause, $having, $params] = $this->buildFilters(
+            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin
+        );
 
-        if (!empty($search)) {
-            $where[]           = '(nom LIKE :search OR description LIKE :search2)';
-            $params[':search']  = '%' . $search . '%';
-            $params[':search2'] = '%' . $search . '%';
-        }
-        if ($categorieId !== null) {
-            $where[]           = 'categorie_id = :cat_id';
-            $params[':cat_id'] = $categorieId;
-        }
-        if ($boutiqueId !== null) {
-            $where[]            = 'boutique_id = :bout_id';
-            $params[':bout_id'] = $boutiqueId;
-        }
-        if ($prixMin !== null) {
-            $where[]             = 'prix >= :prix_min';
-            $params[':prix_min'] = $prixMin;
-        }
-        if ($prixMax !== null) {
-            $where[]             = 'prix <= :prix_max';
-            $params[':prix_max'] = $prixMax;
-        }
+        $sql = "SELECT COUNT(*) FROM (
+                    SELECT p.id
+                    FROM produits p
+                    LEFT JOIN categories c ON c.id = p.categorie_id
+                    LEFT JOIN avis a ON a.produit_id = p.id
+                    WHERE {$whereClause}
+                    GROUP BY p.id
+                    {$having}
+                ) AS filtered";
 
-        $whereClause = implode(' AND ', $where);
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM produits WHERE {$whereClause}");
+        $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
         return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Construit la clause WHERE, la clause HAVING et les paramètres liés,
+     * partagés entre findAll() et countAll().
+     *
+     * @return array{0: string, 1: string, 2: array}
+     */
+    private function buildFilters(
+        ?string         $search,
+        int|string|null $categorie,
+        ?int            $boutiqueId,
+        ?float          $prixMin,
+        ?float          $prixMax,
+        ?float          $noteMin
+    ): array {
+        $where  = ['p.est_actif = 1'];
+        $params = [];
+
+        if (!empty($search)) {
+            $where[]            = '(p.nom LIKE :search OR p.description LIKE :search2)';
+            $params[':search']  = '%' . $search . '%';
+            $params[':search2'] = '%' . $search . '%';
+        }
+
+        if ($categorie !== null && $categorie !== '') {
+            if (is_numeric($categorie)) {
+                $where[]           = 'p.categorie_id = :cat_id';
+                $params[':cat_id'] = (int) $categorie;
+            } else {
+                $where[]             = 'c.slug LIKE :cat_slug';
+                $params[':cat_slug'] = $categorie . '%';
+            }
+        }
+
+        if ($boutiqueId !== null) {
+            $where[]            = 'p.boutique_id = :bout_id';
+            $params[':bout_id'] = $boutiqueId;
+        }
+
+        if ($prixMin !== null) {
+            $where[]             = 'p.prix >= :prix_min';
+            $params[':prix_min'] = $prixMin;
+        }
+
+        if ($prixMax !== null) {
+            $where[]             = 'p.prix <= :prix_max';
+            $params[':prix_max'] = $prixMax;
+        }
+
+        $having = '';
+        if ($noteMin !== null && $noteMin > 0) {
+            $having              = 'HAVING COALESCE(AVG(a.note), 0) >= :note_min';
+            $params[':note_min'] = $noteMin;
+        }
+
+        return [implode(' AND ', $where), $having, $params];
     }
 
     public function findById(int $id): ?array
@@ -166,7 +222,7 @@ class Product
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
 
-        return $row ?: null;
+        return $row ? $this->hydrate($row) : null;
     }
 
     public function getByBoutique(int $boutiqueId, int $page = 1, int $limit = 20): array
@@ -190,7 +246,7 @@ class Product
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll();
+        return array_map([$this, 'hydrate'], $stmt->fetchAll());
     }
 
     // ------------------------------------------------------------------

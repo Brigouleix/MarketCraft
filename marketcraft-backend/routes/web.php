@@ -15,6 +15,7 @@ use App\Controllers\ProductController;
 use App\Controllers\BoutiqueController;
 use App\Controllers\OrderController;
 use App\Controllers\AvisController;
+use App\Controllers\CategorieController;
 use App\Controllers\DashboardController;
 use App\Controllers\UploadController;
 
@@ -113,6 +114,13 @@ $router->post('/products/:id/avis', [AvisController::class, 'store'], ['auth']);
 
 // DELETE /avis/:id           – Supprimer un avis (JWT + owner/admin)
 $router->delete('/avis/:id', [AvisController::class, 'destroy'], ['auth']);
+
+// =========================================================================
+// CATEGORIES
+// =========================================================================
+
+// GET /categories – Liste des catégories (public)
+$router->get('/categories', [CategorieController::class, 'index']);
 
 // =========================================================================
 // DASHBOARD

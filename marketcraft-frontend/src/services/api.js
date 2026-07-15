@@ -13,6 +13,7 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('mc_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    else delete config.headers.Authorization; // évite un token périmé hérité des defaults après logout
     return config;
   },
   (error) => Promise.reject(error)
@@ -32,7 +33,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Un 401 sur les routes d'auth (mauvais identifiants, refresh expiré…)
+    // n'est pas une session expirée : on laisse l'appelant afficher l'erreur.
+    const isAuthRoute = ['/auth/login', '/auth/register', '/auth/refresh'].some(
+      (route) => originalRequest?.url?.includes(route)
+    );
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -114,6 +121,11 @@ export const boutiquesAPI = {
   create: (data) => api.post('/boutiques', data),
   update: (id, data) => api.put(`/boutiques/${id}`, data),
   getProducts: (id, params) => api.get(`/boutiques/${id}/products`, { params }),
+};
+
+// ── Catégories ───────────────────────────────────────────────────────────────
+export const categoriesAPI = {
+  getAll: () => api.get('/categories'),
 };
 
 // ── Avis (Reviews) ───────────────────────────────────────────────────────────

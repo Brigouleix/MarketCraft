@@ -60,7 +60,7 @@ export function AuthProvider({ children }) {
       toast.success(`Bienvenue, ${data.user.prenom || data.user.nom} !`);
       return { success: true, user: data.user };
     } catch (err) {
-      const msg = err.response?.data?.message || 'Email ou mot de passe invalide.';
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Email ou mot de passe invalide.';
       toast.error(msg);
       return { success: false, error: msg };
     } finally {
@@ -76,7 +76,7 @@ export function AuthProvider({ children }) {
       toast.success('Compte créé avec succès !');
       return { success: true, user: data.user };
     } catch (err) {
-      const msg = err.response?.data?.message || 'Erreur lors de la création du compte.';
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Erreur lors de la création du compte.';
       toast.error(msg);
       return { success: false, error: msg };
     } finally {

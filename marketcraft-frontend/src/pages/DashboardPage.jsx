@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { productsAPI, ordersAPI, boutiquesAPI, dashboardAPI, uploadAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useCategories } from '../hooks/useCategories';
 import toast from 'react-hot-toast';
 
 const TABS = [
@@ -179,21 +180,27 @@ function MultiImageUploader({ value = [], onChange }) {
 
 function ProductForm({ product, boutiqueId, onClose, onSaved }) {
   const [form, setForm] = useState({
-    nom:         product?.nom         || '',
-    prix:        product?.prix        || '',
-    stock:       product?.stock       || '',
-    categorie:   product?.categorie   || '',
-    description: product?.description || '',
-    images:      product?.images      ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images) : [],
-    boutique_id: product?.boutique_id || boutiqueId || '',
+    nom:          product?.nom          || '',
+    prix:         product?.prix         || '',
+    stock:        product?.stock        ?? '',
+    categorie_id: product?.categorie_id || '',
+    description:  product?.description  || '',
+    images:       product?.images       ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images) : [],
+    boutique_id:  product?.boutique_id  || boutiqueId || '',
   });
   const queryClient = useQueryClient();
+  const { data: categories = [] } = useCategories();
 
   const up = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
-      const payload = { ...form, prix: parseFloat(form.prix), stock: parseInt(form.stock) };
+      const payload = {
+        ...form,
+        prix: parseFloat(form.prix),
+        stock: parseInt(form.stock),
+        categorie_id: form.categorie_id ? parseInt(form.categorie_id, 10) : null,
+      };
       return product?.id ? productsAPI.update(product.id, payload) : productsAPI.create(payload);
     },
     onSuccess: () => {
@@ -206,7 +213,7 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.nom.trim() || !form.prix || !form.stock) {
+    if (!form.nom.trim() || !form.prix || form.stock === '') {
       toast.error('Remplissez tous les champs obligatoires.'); return;
     }
     mutate();
@@ -244,8 +251,13 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <input value={form.categorie} onChange={(e) => up('categorie')(e.target.value)}
-              className="input-field text-sm" placeholder="ceramique, bijoux…" />
+            <select value={form.categorie_id} onChange={(e) => up('categorie_id')(e.target.value)}
+              className="input-field text-sm bg-white cursor-pointer">
+              <option value="">— Choisir une catégorie —</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.nom}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>

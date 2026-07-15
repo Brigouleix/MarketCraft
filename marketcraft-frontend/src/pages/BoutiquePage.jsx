@@ -80,7 +80,8 @@ export default function BoutiquePage() {
     staleTime: 1000 * 60 * 2,
   });
 
-  const boutique = boutiqueData?.boutique || boutiqueData || MOCK_BOUTIQUE;
+  // L'API renvoie { success, message, data: {...} } — la boutique est dans data
+  const boutique = boutiqueData?.data ?? boutiqueData?.boutique ?? MOCK_BOUTIQUE;
   const products =
     productsData?.data || productsData?.products || (productsLoading ? [] : MOCK_PRODUCTS);
 
