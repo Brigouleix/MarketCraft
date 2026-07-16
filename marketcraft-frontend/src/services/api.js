@@ -110,7 +110,7 @@ export const ordersAPI = {
   getAll: (params) => api.get('/orders', { params }),
   getById: (id) => api.get(`/orders/${id}`),
   create: (data) => api.post('/orders', data),
-  updateStatus: (id, status) => api.patch(`/orders/${id}/status`, { status }),
+  updateStatus: (id, status) => api.put(`/orders/${id}/status`, { statut: status }),
 };
 
 // ── Boutiques ─────────────────────────────────────────────────────────────────

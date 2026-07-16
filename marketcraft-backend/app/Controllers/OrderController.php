@@ -8,16 +8,22 @@ use App\Core\Controller;
 use App\Core\Auth;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Payment;
+use App\Models\Address;
 
 class OrderController extends Controller
 {
     private Order   $orderModel;
     private Product $productModel;
+    private Payment $paymentModel;
+    private Address $addressModel;
 
     public function __construct()
     {
         $this->orderModel   = new Order();
         $this->productModel = new Product();
+        $this->paymentModel = new Payment();
+        $this->addressModel = new Address();
     }
 
     // ------------------------------------------------------------------
@@ -121,6 +127,35 @@ class OrderController extends Controller
             ];
         }
 
+        // Adresse de livraison : identifiant existant, ou objet à enregistrer
+        $adresseId = isset($body['adresse_livraison_id']) ? (int) $body['adresse_livraison_id'] : null;
+
+        if ($adresseId === null && !empty($body['adresse_livraison']) && is_array($body['adresse_livraison'])) {
+            $addr = $body['adresse_livraison'];
+
+            $addrErrors = $this->validate($addr, [
+                'nom_complet' => 'required|min:2|max:200',
+                'ligne1'      => 'required|min:3|max:255',
+                'ville'       => 'required|max:100',
+                'code_postal' => 'required|min:4|max:20',
+            ]);
+
+            if (!empty($addrErrors)) {
+                $this->error('Validation failed (adresse de livraison).', 422, $addrErrors);
+                return;
+            }
+
+            $adresseId = $this->addressModel->create([
+                'utilisateur_id' => (int) $auth['sub'],
+                'nom_complet'    => $addr['nom_complet'],
+                'ligne1'         => $addr['ligne1'],
+                'ligne2'         => $addr['ligne2'] ?? null,
+                'ville'          => $addr['ville'],
+                'code_postal'    => $addr['code_postal'],
+                'pays'           => $addr['pays'] ?? 'France',
+            ]);
+        }
+
         try {
             // Décrémenter le stock de chaque produit
             foreach ($lignes as $ligne) {
@@ -129,13 +164,32 @@ class OrderController extends Controller
 
             $order = $this->orderModel->create([
                 'utilisateur_id'      => (int) $auth['sub'],
-                'adresse_livraison_id' => isset($body['adresse_livraison_id'])
-                    ? (int) $body['adresse_livraison_id']
-                    : null,
+                'adresse_livraison_id' => $adresseId,
                 'frais_livraison'     => (float) ($body['frais_livraison'] ?? 5.90),
                 'note'                => $body['note'] ?? null,
                 'lignes'              => $lignes,
             ]);
+
+            // Paiement simulé : la plateforme n'est pas reliée à un prestataire
+            // réel — la transaction est enregistrée avec un identifiant SIM-.
+            $methode = $body['paiement']['methode'] ?? 'carte';
+            if (!in_array($methode, ['carte', 'virement', 'paypal', 'cheque'], true)) {
+                $methode = 'carte';
+            }
+
+            $paiement = $this->paymentModel->create([
+                'commande_id'    => (int) $order['id'],
+                'methode'        => $methode,
+                'statut'         => 'valide',
+                'montant'        => (float) $order['montant_total'],
+                'transaction_id' => 'SIM-' . date('Ymd-His') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                'payload'        => [
+                    'simulation' => true,
+                    'detail'     => $body['paiement']['detail'] ?? null,
+                ],
+            ]);
+
+            $order['paiement'] = $paiement;
 
             $this->json(['success' => true, 'message' => 'Order created.', 'data' => $order], 201);
         } catch (\Throwable $e) {

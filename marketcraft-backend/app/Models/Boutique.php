@@ -63,6 +63,7 @@ class Boutique
     {
         $offset = ($page - 1) * $limit;
 
+        // Une boutique sans produit actif n'apparaît pas dans le catalogue public
         $stmt = $this->db->prepare(
             'SELECT b.*, u.nom AS vendeur_nom, u.prenom AS vendeur_prenom,
                     COUNT(p.id) AS nb_produits
@@ -71,6 +72,7 @@ class Boutique
              LEFT JOIN produits p ON p.boutique_id = b.id AND p.est_actif = 1
              WHERE b.est_active = 1
              GROUP BY b.id
+             HAVING nb_produits > 0
              ORDER BY b.created_at DESC
              LIMIT :limit OFFSET :offset'
         );
@@ -83,7 +85,11 @@ class Boutique
 
     public function count(): int
     {
-        return (int) $this->db->query('SELECT COUNT(*) FROM boutiques WHERE est_active = 1')->fetchColumn();
+        return (int) $this->db->query(
+            'SELECT COUNT(*) FROM boutiques b
+             WHERE b.est_active = 1
+               AND EXISTS (SELECT 1 FROM produits p WHERE p.boutique_id = b.id AND p.est_actif = 1)'
+        )->fetchColumn();
     }
 
     // ------------------------------------------------------------------

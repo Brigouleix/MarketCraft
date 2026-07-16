@@ -69,7 +69,7 @@ function AvisForm({ productId, onSuccess }) {
       onSuccess?.();
     },
     onError: (err) => {
-      toast.error(err.response?.data?.message || 'Erreur lors de la publication.');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Erreur lors de la publication.');
     },
   });
 

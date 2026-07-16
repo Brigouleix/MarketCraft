@@ -8,16 +8,19 @@ use App\Core\Controller;
 use App\Core\Auth;
 use App\Models\Avis;
 use App\Models\Product;
+use App\Models\Order;
 
 class AvisController extends Controller
 {
     private Avis    $avisModel;
     private Product $productModel;
+    private Order   $orderModel;
 
     public function __construct()
     {
         $this->avisModel    = new Avis();
         $this->productModel = new Product();
+        $this->orderModel   = new Order();
     }
 
     // ------------------------------------------------------------------
@@ -73,6 +76,12 @@ class AvisController extends Controller
 
         $userId = (int) $auth['sub'];
 
+        // Seuls les acheteurs du produit peuvent laisser un avis
+        if (!$this->orderModel->userHasPurchasedProduct($userId, $produitId)) {
+            $this->error('Vous ne pouvez laisser un avis que sur un produit que vous avez commandé.', 403);
+            return;
+        }
+
         // Vérifier si l'utilisateur a déjà posté un avis sur ce produit
         if ($this->avisModel->userAlreadyReviewed($produitId, $userId)) {
             $this->error('You have already reviewed this product.', 409);
@@ -102,6 +111,7 @@ class AvisController extends Controller
                 'note'           => $note,
                 'titre'          => isset($body['titre'])       ? strip_tags(trim($body['titre']))       : null,
                 'commentaire'    => isset($body['commentaire']) ? strip_tags(trim($body['commentaire'])) : null,
+                'est_verifie'    => 1, // achat vérifié ci-dessus
             ]);
 
             $this->json(['success' => true, 'message' => 'Review posted.', 'data' => $avis], 201);

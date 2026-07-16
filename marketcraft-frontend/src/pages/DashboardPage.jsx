@@ -286,6 +286,8 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  // Boutique fraîchement créée : on enchaîne sur le premier produit
+  const [newBoutiqueId, setNewBoutiqueId] = useState(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -366,7 +368,22 @@ export default function DashboardPage() {
   const saveBoutiqueMutation = useMutation({
     mutationFn: () =>
       boutique.id ? boutiquesAPI.update(boutique.id, boutiqueForm) : boutiquesAPI.create(boutiqueForm),
-    onSuccess: () => { toast.success('Boutique sauvegardée !'); queryClient.invalidateQueries(['my-boutique']); },
+    onSuccess: (res) => {
+      const isCreation = !boutique.id;
+      queryClient.invalidateQueries(['my-boutique']);
+      if (isCreation) {
+        // Une boutique sans produit n'apparaît pas dans le catalogue :
+        // on enchaîne directement sur la création du premier produit.
+        const created = res?.data?.data;
+        if (created?.id) setNewBoutiqueId(created.id);
+        setEditingProduct(null);
+        setShowProductForm(true);
+        setActiveTab('products');
+        toast.success('Boutique créée ! Ajoutez votre premier produit pour la rendre visible dans le catalogue.', { duration: 6000 });
+      } else {
+        toast.success('Boutique sauvegardée !');
+      }
+    },
     onError:   () => toast.error('Erreur de sauvegarde.'),
   });
 
@@ -462,7 +479,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Products ─────────────────────────────────────────────────────── */}
-      {activeTab === 'products' && !boutique?.id ? (
+      {activeTab === 'products' && !boutique?.id && !newBoutiqueId ? (
         <div className="card p-12 text-center">
           <Store size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-500 mb-4">
@@ -559,7 +576,7 @@ export default function DashboardPage() {
           {showProductForm && (
             <ProductForm
               product={editingProduct}
-              boutiqueId={boutique?.id}
+              boutiqueId={boutique?.id || newBoutiqueId}
               onClose={() => setShowProductForm(false)}
               onSaved={() => setShowProductForm(false)}
             />
