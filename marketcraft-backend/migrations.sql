@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `boutiques` (
   `updated_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_boutiques_slug` (`slug`),
-  KEY `idx_boutiques_vendeur` (`vendeur_id`),
+  UNIQUE KEY `uq_boutiques_vendeur` (`vendeur_id`) COMMENT 'Règle de gestion : au plus une boutique par vendeur',
   CONSTRAINT `fk_boutiques_vendeur`
     FOREIGN KEY (`vendeur_id`) REFERENCES `utilisateurs` (`id`)
     ON DELETE CASCADE ON UPDATE CASCADE
@@ -131,6 +131,28 @@ CREATE TABLE IF NOT EXISTS `produits` (
     FOREIGN KEY (`categorie_id`) REFERENCES `categories` (`id`)
     ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -------------------------------------------------------------
+-- Table : produit_categorie (liaison N-N produits ↔ categories)
+-- produits.categorie_id reste la catégorie principale (la 1re
+-- sélectionnée) ; cette table porte l'ensemble des catégories.
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `produit_categorie` (
+  `produit_id`   INT UNSIGNED NOT NULL,
+  `categorie_id` INT UNSIGNED NOT NULL,
+  PRIMARY KEY (`produit_id`, `categorie_id`),
+  KEY `idx_pc_categorie` (`categorie_id`),
+  CONSTRAINT `fk_pc_produit`
+    FOREIGN KEY (`produit_id`) REFERENCES `produits` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_pc_categorie`
+    FOREIGN KEY (`categorie_id`) REFERENCES `categories` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Reprise des catégories principales existantes dans la liaison
+INSERT IGNORE INTO `produit_categorie` (`produit_id`, `categorie_id`)
+SELECT `id`, `categorie_id` FROM `produits` WHERE `categorie_id` IS NOT NULL;
 
 -- -------------------------------------------------------------
 -- Table : commandes

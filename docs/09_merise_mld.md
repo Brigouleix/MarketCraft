@@ -2,6 +2,10 @@
 
 Description : Le MLD traduit le MCD en un modèle relationnel indépendant de tout SGBDR précis. Chaque entité devient une table, chaque association est matérialisée par une clé étrangère placée du côté « plusieurs » de la cardinalité, en respectant les règles de normalisation (1FN, 2FN, 3FN). Les types restent génériques (INT, VARCHAR, DATETIME, ENUM, JSON, BOOLEAN) : la déclinaison technique précise (moteur de stockage, charset, index de performance, contraintes CHECK, script SQL exécutable) est traitée dans le [Modèle Physique de Données (MPD)](13_merise_mpd.md).
 
+> **Version notation relationnelle** : le schéma relationnel du modèle réellement implémenté (base `marketcraft_3eme_dev`, 10 relations dont la liaison n-n `produit_categorie`) est disponible dans [`09_merise_mld.svg`](09_merise_mld.svg), en notation Merise classique — clé primaire soulignée, `#` pour les clés étrangères, `*` pour les unicités — avec le rappel des règles de passage MCD → MLD.
+
+![MLD MarketCraft](09_merise_mld.svg)
+
 ```mermaid
 erDiagram
     utilisateurs {

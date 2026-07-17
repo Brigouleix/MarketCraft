@@ -135,9 +135,9 @@ export default function Footer() {
             © {new Date().getFullYear()} MarketCraft. Tous droits réservés.
           </p>
           <div className="flex items-center gap-4 text-xs text-gray-500">
-            <a href="#" className="hover:text-white transition-colors">Politique de confidentialité</a>
-            <a href="#" className="hover:text-white transition-colors">CGV</a>
-            <a href="#" className="hover:text-white transition-colors">Cookies</a>
+            <button type="button" className="hover:text-white transition-colors">Politique de confidentialité</button>
+            <button type="button" className="hover:text-white transition-colors">CGV</button>
+            <button type="button" className="hover:text-white transition-colors">Cookies</button>
           </div>
         </div>
       </div>

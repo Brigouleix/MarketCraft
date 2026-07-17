@@ -183,7 +183,10 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
     nom:          product?.nom          || '',
     prix:         product?.prix         || '',
     stock:        product?.stock        ?? '',
-    categorie_id: product?.categorie_id || '',
+    // Catégories multiples : liste issue de la liaison, ou l'ancienne catégorie unique
+    categorie_ids: product?.categories?.length
+      ? product.categories.map((c) => c.id)
+      : (product?.categorie_id ? [product.categorie_id] : []),
     description:  product?.description  || '',
     images:       product?.images       ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images) : [],
     boutique_id:  product?.boutique_id  || boutiqueId || '',
@@ -193,13 +196,21 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
 
   const up = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const toggleCategorie = (id) =>
+    setForm((f) => ({
+      ...f,
+      categorie_ids: f.categorie_ids.includes(id)
+        ? f.categorie_ids.filter((c) => c !== id)
+        : [...f.categorie_ids, id],
+    }));
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
       const payload = {
         ...form,
         prix: parseFloat(form.prix),
         stock: parseInt(form.stock),
-        categorie_id: form.categorie_id ? parseInt(form.categorie_id, 10) : null,
+        categorie_ids: form.categorie_ids.map((id) => parseInt(id, 10)),
       };
       return product?.id ? productsAPI.update(product.id, payload) : productsAPI.create(payload);
     },
@@ -250,14 +261,37 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <select value={form.categorie_id} onChange={(e) => up('categorie_id')(e.target.value)}
-              className="input-field text-sm bg-white cursor-pointer">
-              <option value="">— Choisir une catégorie —</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.nom}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Catégories <span className="text-gray-400 font-normal">(plusieurs choix possibles)</span>
+            </label>
+            <div className="flex flex-wrap gap-2 p-3 border border-secondary-300 rounded-lg bg-secondary-50 max-h-32 overflow-y-auto">
+              {categories.map((cat) => {
+                const checked = form.categorie_ids.includes(cat.id);
+                return (
+                  <label
+                    key={cat.id}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs cursor-pointer border transition-colors ${
+                      checked
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-gray-700 border-secondary-300 hover:border-primary'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleCategorie(cat.id)}
+                      className="sr-only"
+                    />
+                    {cat.nom}
+                  </label>
+                );
+              })}
+            </div>
+            {form.categorie_ids.length > 1 && (
+              <p className="text-xs text-gray-400 mt-1">
+                La première sélectionnée sert de catégorie principale.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -546,7 +580,11 @@ export default function DashboardPage() {
                             <span className="font-medium text-gray-800">{product.nom}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 capitalize">{product.categorie_nom || product.categorie || '–'}</td>
+                        <td className="px-4 py-3 text-gray-600 capitalize">
+                          {product.categories?.length
+                            ? product.categories.map((c) => c.nom).join(', ')
+                            : (product.categorie_nom || product.categorie || '–')}
+                        </td>
                         <td className="px-4 py-3 font-semibold text-primary">{Number(product.prix).toFixed(2)} €</td>
                         <td className="px-4 py-3">
                           <span className={`font-medium ${product.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>

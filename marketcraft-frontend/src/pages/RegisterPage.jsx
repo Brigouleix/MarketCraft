@@ -225,8 +225,8 @@ export default function RegisterPage() {
               <input type="checkbox" required className="mt-0.5 text-primary" />
               <span className="text-xs text-gray-600">
                 En m'inscrivant, j'accepte les{' '}
-                <a href="#" className="text-primary underline">conditions d'utilisation</a> et la{' '}
-                <a href="#" className="text-primary underline">politique de confidentialité</a>.
+                <span className="text-primary underline">conditions d'utilisation</span> et la{' '}
+                <span className="text-primary underline">politique de confidentialité</span>.
               </span>
             </label>
 

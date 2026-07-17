@@ -2,6 +2,10 @@
 
 Description : Ce diagramme représente les cas d'utilisation de MarketCraft selon la notation UML, en identifiant les trois acteurs principaux (Acheteur, Vendeur, Admin) et l'ensemble de leurs interactions avec le système, avec les relations include (fonctionnalité obligatoire) et extend (fonctionnalité optionnelle).
 
+> **Version UML classique** : une version synthétique au format UML traditionnel (acteurs en bonshommes bâtons, ellipses, relations `<<include>>` / `<<extend>>`, généralisation Visiteur ← Client) est disponible dans [`12_cas_utilisation_uml.svg`](12_cas_utilisation_uml.svg).
+
+![Diagramme de cas d'utilisation UML](12_cas_utilisation_uml.svg)
+
 ```mermaid
 graph LR
     %% ─── ACTEURS ───

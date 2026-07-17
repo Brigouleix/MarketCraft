@@ -66,10 +66,13 @@ class Product
 
         $sql = "SELECT p.*, b.nom AS boutique_nom, c.nom AS categorie_nom,
                        COALESCE(AVG(a.note), 0) AS note_moyenne,
-                       COUNT(DISTINCT a.id) AS nb_avis
+                       COUNT(DISTINCT a.id) AS nb_avis,
+                       GROUP_CONCAT(DISTINCT CONCAT(c2.id, ':', c2.nom) SEPARATOR '||') AS categories_concat
                 FROM produits p
                 LEFT JOIN boutiques b ON b.id = p.boutique_id
                 LEFT JOIN categories c ON c.id = p.categorie_id
+                LEFT JOIN produit_categorie pc ON pc.produit_id = p.id
+                LEFT JOIN categories c2 ON c2.id = pc.categorie_id
                 LEFT JOIN avis a ON a.produit_id = p.id
                 WHERE {$whereClause}
                 GROUP BY p.id
@@ -112,6 +115,18 @@ class Product
         if (!isset($row['categorie']) && !empty($row['categorie_nom'])) {
             $row['categorie'] = $row['categorie_nom'];
         }
+
+        // Liste complète des catégories (table de liaison produit_categorie)
+        $row['categories'] = [];
+        if (!empty($row['categories_concat'])) {
+            foreach (explode('||', $row['categories_concat']) as $pair) {
+                [$catId, $catNom] = array_pad(explode(':', $pair, 2), 2, '');
+                if ($catId !== '') {
+                    $row['categories'][] = ['id' => (int) $catId, 'nom' => $catNom];
+                }
+            }
+        }
+        unset($row['categories_concat']);
 
         return $row;
     }
@@ -171,11 +186,16 @@ class Product
         }
 
         if ($categorie !== null && $categorie !== '') {
+            // Le produit matche s'il est rattaché à la catégorie via la table
+            // de liaison (couvre aussi la catégorie principale, migrée dedans)
             if (is_numeric($categorie)) {
-                $where[]           = 'p.categorie_id = :cat_id';
+                $where[] = 'EXISTS (SELECT 1 FROM produit_categorie pcf
+                                     WHERE pcf.produit_id = p.id AND pcf.categorie_id = :cat_id)';
                 $params[':cat_id'] = (int) $categorie;
             } else {
-                $where[]             = 'c.slug LIKE :cat_slug';
+                $where[] = 'EXISTS (SELECT 1 FROM produit_categorie pcf
+                                     JOIN categories cf ON cf.id = pcf.categorie_id
+                                     WHERE pcf.produit_id = p.id AND cf.slug LIKE :cat_slug)';
                 $params[':cat_slug'] = $categorie . '%';
             }
         }
@@ -210,10 +230,13 @@ class Product
             'SELECT p.*, b.nom AS boutique_nom, b.vendeur_id,
                     c.nom AS categorie_nom,
                     COALESCE(AVG(a.note), 0) AS note_moyenne,
-                    COUNT(DISTINCT a.id) AS nb_avis
+                    COUNT(DISTINCT a.id) AS nb_avis,
+                    GROUP_CONCAT(DISTINCT CONCAT(c2.id, \':\', c2.nom) SEPARATOR \'||\') AS categories_concat
              FROM produits p
              LEFT JOIN boutiques b ON b.id = p.boutique_id
              LEFT JOIN categories c ON c.id = p.categorie_id
+             LEFT JOIN produit_categorie pc ON pc.produit_id = p.id
+             LEFT JOIN categories c2 ON c2.id = pc.categorie_id
              LEFT JOIN avis a ON a.produit_id = p.id
              WHERE p.id = :id AND p.est_actif = 1
              GROUP BY p.id
@@ -257,6 +280,9 @@ class Product
     {
         $slug = $this->generateSlug($data['nom']);
 
+        // Catégories multiples : la première devient la catégorie principale
+        $categorieIds = $this->normalizeCategorieIds($data);
+
         $stmt = $this->db->prepare(
             'INSERT INTO produits
                (boutique_id, categorie_id, nom, slug, description, prix, stock, images, tags, est_fait_main)
@@ -266,7 +292,7 @@ class Product
 
         $stmt->execute([
             ':boutique_id'   => $data['boutique_id'],
-            ':categorie_id'  => $data['categorie_id'] ?? null,
+            ':categorie_id'  => $categorieIds[0] ?? null,
             ':nom'           => trim($data['nom']),
             ':slug'          => $slug,
             ':description'   => $data['description'] ?? null,
@@ -277,7 +303,53 @@ class Product
             ':est_fait_main' => (int) ($data['est_fait_main'] ?? 1),
         ]);
 
-        return $this->findById((int) $this->db->lastInsertId());
+        $id = (int) $this->db->lastInsertId();
+        $this->syncCategories($id, $categorieIds);
+
+        return $this->findById($id);
+    }
+
+    /**
+     * Extrait la liste des ids de catégories depuis les données reçues :
+     * `categorie_ids` (tableau) prioritaire, sinon `categorie_id` (scalaire).
+     *
+     * @return int[] Ids uniques, sans zéros ni doublons
+     */
+    private function normalizeCategorieIds(array $data): array
+    {
+        $ids = [];
+        if (isset($data['categorie_ids']) && is_array($data['categorie_ids'])) {
+            $ids = $data['categorie_ids'];
+        } elseif (!empty($data['categorie_id'])) {
+            $ids = [$data['categorie_id']];
+        }
+
+        $ids = array_map('intval', $ids);
+        $ids = array_filter($ids, fn(int $id) => $id > 0);
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * Remplace les liaisons produit ↔ catégories par la liste fournie.
+     *
+     * @param int[] $categorieIds
+     */
+    private function syncCategories(int $productId, array $categorieIds): void
+    {
+        $this->db->prepare('DELETE FROM produit_categorie WHERE produit_id = :id')
+                 ->execute([':id' => $productId]);
+
+        if (empty($categorieIds)) {
+            return;
+        }
+
+        $stmt = $this->db->prepare(
+            'INSERT IGNORE INTO produit_categorie (produit_id, categorie_id) VALUES (:pid, :cid)'
+        );
+        foreach ($categorieIds as $catId) {
+            $stmt->execute([':pid' => $productId, ':cid' => $catId]);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -286,6 +358,16 @@ class Product
 
     public function update(int $id, array $data): ?array
     {
+        // Catégories multiples : synchroniser la liaison et aligner la
+        // catégorie principale sur la première de la liste
+        if (isset($data['categorie_ids']) && is_array($data['categorie_ids'])) {
+            $categorieIds = $this->normalizeCategorieIds($data);
+            $this->syncCategories($id, $categorieIds);
+            $data['categorie_id'] = $categorieIds[0] ?? null;
+        } elseif (array_key_exists('categorie_id', $data)) {
+            $this->syncCategories($id, $this->normalizeCategorieIds($data));
+        }
+
         $fields = [];
         $params = [':id' => $id];
 

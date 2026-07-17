@@ -2,7 +2,6 @@ import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart,
-  User,
   Search,
   Menu,
   X,

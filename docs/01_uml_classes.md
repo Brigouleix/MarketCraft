@@ -1,298 +1,227 @@
 # Diagramme de Classes UML - MarketCraft
 
-Description : Représentation complète des classes du domaine métier de MarketCraft, une plateforme e-commerce artisanale. Ce diagramme montre toutes les entités, leurs attributs typés, leurs méthodes et l'ensemble des relations entre elles.
+Description : Représentation des classes du domaine métier de MarketCraft, alignée sur le schéma réel de la base `marketcraft_3eme_dev` (voir `13_merise_mpd.md` / `marketcraft-backend/migrations.sql`). Chaque classe montre ses attributs typés, ses méthodes et les relations (associations, compositions) avec leurs multiplicités.
+
+> **Version UML classique** : le même diagramme au format image est disponible dans [`01_uml_classes.svg`](01_uml_classes.svg).
+
+![Diagramme de classes UML](01_uml_classes.svg)
+
+> **Note de modélisation** : conformément à l'UML, les clés étrangères (`commandeId`, `produitId`…) n'apparaissent pas comme attributs — ce sont les associations qui portent les liens. Elles ne réapparaissent qu'au niveau physique (MPD). Les tables techniques `lignes_commande` et `produit_categorie` du MPD correspondent ici respectivement à la classe `LigneCommande` (association porteuse d'attributs) et à l'association N-N `Produit` ↔ `Categorie`.
 
 ```mermaid
 classDiagram
     direction TB
 
     class Utilisateur {
-        +Int id
-        +String nom
-        +String prenom
-        +String email
-        +String motDePasseHash
-        +String telephone
-        +enum role
-        +Boolean estActif
-        +DateTime dateInscription
-        +DateTime derniereConnexion
-        +String tokenReset
-        +DateTime tokenResetExpiration
-        +seConnecter(email, motDePasse) String
-        +seDeconnecter() void
-        +reinitialiserMotDePasse(token, nouveau) Boolean
-        +mettreAJourProfil(donnees) Utilisateur
-        +verifierEmail(token) Boolean
+        -Int id
+        -String nom
+        -String prenom
+        -String email
+        -String passwordHash
+        -Role role
+        -String avatarUrl
+        -String telephone
+        -Boolean estActif
+        -DateTime createdAt
+        -DateTime updatedAt
+        +seConnecter(email, motDePasse) Boolean
+        +mettreAJourProfil(donnees) void
         +obtenirCommandes() Commande[]
-        +obtenirAvis() Avis[]
+        +obtenirBoutique() Boutique
     }
 
     class Boutique {
-        +Int id
-        +Int utilisateurId
-        +String nom
-        +String slug
-        +String description
-        +String logo
-        +String banniere
-        +enum statut
-        +Float noteMoyenne
-        +Int nombreVentes
-        +DateTime dateCreation
-        +DateTime dateMiseAJour
-        +String adresse
-        +String ville
-        +String codePostal
-        +String pays
-        +String siret
-        +creer(donnees) Boutique
-        +mettreAJour(donnees) Boutique
-        +activer() void
-        +suspendre(raison) void
+        -Int id
+        -String nom
+        -String slug
+        -String description
+        -String logoUrl
+        -String banniereUrl
+        -Boolean estActive
+        -Decimal noteMoyenne
+        -DateTime createdAt
+        -DateTime updatedAt
         +obtenirProduits() Produit[]
-        +obtenirStatistiques() Object
-        +calculerNoteMoyenne() Float
+        +calculerNoteMoyenne() Decimal
+        +desactiver() void
     }
 
     class Categorie {
-        +Int id
-        +Int parentId
-        +String nom
-        +String slug
-        +String description
-        +String icone
-        +String image
-        +Int ordre
-        +Boolean estActive
-        +obtenirProduits() Produit[]
+        -Int id
+        -String nom
+        -String slug
+        -String description
+        -String imageUrl
+        -Int ordre
+        -DateTime createdAt
         +obtenirSousCategories() Categorie[]
-        +obtenirChemin() Categorie[]
+        +obtenirProduits() Produit[]
     }
 
     class Produit {
-        +Int id
-        +Int boutiqueId
-        +Int categorieId
-        +String nom
-        +String slug
-        +String description
-        +String descriptionCourte
-        +Float prix
-        +Float prixPromo
-        +Int stock
-        +Int stockMinimum
-        +String[] images
-        +String[] tags
-        +enum statut
-        +Boolean estMisEnAvant
-        +Float poids
-        +String dimensions
-        +Float noteMoyenne
-        +Int nombreAvis
-        +DateTime dateCreation
-        +DateTime dateMiseAJour
-        +creer(donnees) Produit
-        +mettreAJour(donnees) Produit
-        +publier() void
-        +archiver() void
+        -Int id
+        -String nom
+        -String slug
+        -String description
+        -Decimal prix
+        -Int stock
+        -Decimal noteMoyenne
+        -Int nombreAvis
+        -String[] images
+        -String[] tags
+        -Boolean estActif
+        -Boolean estFaitMain
+        -DateTime createdAt
+        -DateTime updatedAt
+        +estDisponible(quantite) Boolean
         +mettreAJourStock(quantite) void
-        +estDisponible() Boolean
         +obtenirAvis() Avis[]
-        +appliquerPromotion(prix) void
     }
 
     class LigneCommande {
-        +Int id
-        +Int commandeId
-        +Int produitId
-        +String nomProduit
-        +Float prixUnitaire
-        +Int quantite
-        +Float sousTotal
-        +String[] optionsChoisies
-        +calculerSousTotal() Float
-        +obtenirProduit() Produit
+        -Int id
+        -Int quantite
+        -Decimal prixUnitaire
+        -String nomProduit
+        +calculerSousTotal() Decimal
     }
 
     class Commande {
-        +Int id
-        +Int acheteurId
-        +Int adresseId
-        +String reference
-        +enum statut
-        +Float sousTotal
-        +Float fraisLivraison
-        +Float taxe
-        +Float total
-        +String modeLivraison
-        +String numeroDeSuivi
-        +String notes
-        +DateTime dateCommande
-        +DateTime dateExpedition
-        +DateTime dateLivraison
-        +DateTime dateMiseAJour
-        +calculerTotal() Float
+        -Int id
+        -StatutCommande statut
+        -Decimal montantTotal
+        -Decimal fraisLivraison
+        -String note
+        -String numeroSuivi
+        -DateTime dateLivraison
+        -DateTime createdAt
+        -DateTime updatedAt
+        +calculerTotal() Decimal
         +changerStatut(nouveauStatut) void
-        +annuler(raison) Boolean
-        +ajouterSuivi(numero) void
-        +obtenirLignes() LigneCommande[]
-        +obtenirPaiement() Paiement
-        +genererFacture() PDF
+        +annuler() Boolean
     }
 
     class Paiement {
-        +Int id
-        +Int commandeId
-        +String stripePaymentIntentId
-        +String stripeChargeId
-        +Float montant
-        +String devise
-        +enum statut
-        +String methode
-        +String derniers4Chiffres
-        +String marqueCarteAlias
-        +DateTime datePaiement
-        +DateTime dateRemboursement
-        +String raisonEchec
-        +capturer() Boolean
-        +rembourser(montant) Boolean
-        +libererVersVendeur() Boolean
-        +verifierStatut() enum
+        -Int id
+        -MethodePaiement methode
+        -StatutPaiement statut
+        -Decimal montant
+        -String transactionId
+        -DateTime dateLiberation
+        -Json payload
+        -DateTime createdAt
+        -DateTime updatedAt
+        +valider() Boolean
+        +rembourser() Boolean
+        +liberer() void
     }
 
     class Avis {
-        +Int id
-        +Int produitId
-        +Int utilisateurId
-        +Int commandeId
-        +Int note
-        +String titre
-        +String commentaire
-        +String[] photos
-        +Boolean estVerifie
-        +Boolean estVisible
-        +Int nombreUtiles
-        +DateTime dateCreation
-        +DateTime dateMiseAJour
-        +String reponseVendeur
-        +DateTime dateReponseVendeur
-        +valider() void
-        +masquer(raison) void
-        +ajouterReponse(texte) void
-        +marquerUtile() void
+        -Int id
+        -Int note
+        -String titre
+        -String commentaire
+        -Boolean estVerifie
+        -DateTime createdAt
+        +verifier() void
     }
 
     class AdresseLivraison {
-        +Int id
-        +Int utilisateurId
-        +String nom
-        +String prenom
-        +String entreprise
-        +String ligne1
-        +String ligne2
-        +String ville
-        +String codePostal
-        +String region
-        +String pays
-        +String telephone
-        +Boolean estParDefaut
-        +valider() Boolean
-        +formaterPourEnvoi() String
+        -Int id
+        -String nomComplet
+        -String ligne1
+        -String ligne2
+        -String ville
+        -String codePostal
+        -String pays
+        -Boolean estPrincipale
+        -DateTime createdAt
+        +formater() String
     }
 
     class Role {
         <<enumeration>>
-        ACHETEUR
+        CLIENT
         VENDEUR
         ADMIN
-        SUPER_ADMIN
-    }
-
-    class StatutBoutique {
-        <<enumeration>>
-        EN_ATTENTE
-        ACTIVE
-        SUSPENDUE
-        FERMEE
-    }
-
-    class StatutProduit {
-        <<enumeration>>
-        BROUILLON
-        PUBLIE
-        EN_RUPTURE
-        ARCHIVE
     }
 
     class StatutCommande {
         <<enumeration>>
-        EN_ATTENTE_PAIEMENT
-        PAYEE
+        EN_ATTENTE
+        CONFIRMEE
         EN_PREPARATION
         EXPEDIEE
         LIVREE
         ANNULEE
-        REMBOURSEE
     }
 
     class StatutPaiement {
         <<enumeration>>
         EN_ATTENTE
-        CAPTURE
-        LIBERE
+        VALIDE
+        REFUSE
         REMBOURSE
-        ECHOUE
+        LIBERE
+    }
+
+    class MethodePaiement {
+        <<enumeration>>
+        CARTE
+        VIREMENT
+        PAYPAL
+        CHEQUE
     }
 
     %% Relations
     Utilisateur "1" --> "0..1" Boutique : possède
+    Utilisateur "1" *-- "0..*" AdresseLivraison : compose
     Utilisateur "1" --> "0..*" Commande : passe
     Utilisateur "1" --> "0..*" Avis : rédige
-    Utilisateur "1" --> "0..*" AdresseLivraison : a
 
     Boutique "1" *-- "0..*" Produit : contient
 
-    Categorie "1" --> "0..*" Produit : classe
+    Produit "0..*" --> "0..1" Categorie : catégorie principale
+    Produit "0..*" --> "0..*" Categorie : classé dans
     Categorie "0..1" --> "0..*" Categorie : sous-catégorie de
 
     Commande "1" *-- "1..*" LigneCommande : composée de
-    Commande "1" --> "1" AdresseLivraison : livrée à
-    Commande "1" *-- "1" Paiement : réglée par
+    Commande "1" *-- "0..1" Paiement : réglée par
+    Commande "0..*" --> "0..1" AdresseLivraison : livrée à
 
     LigneCommande "0..*" --> "1" Produit : référence
 
-    Avis "0..*" --> "1" Produit : concerne
-    Avis "0..*" --> "0..1" Commande : issu de
+    Produit "1" *-- "0..*" Avis : concerne
 
-    Utilisateur --> Role : a
-    Boutique --> StatutBoutique : a
-    Produit --> StatutProduit : a
-    Commande --> StatutCommande : a
-    Paiement --> StatutPaiement : a
+    Utilisateur ..> Role
+    Commande ..> StatutCommande
+    Paiement ..> StatutPaiement
+    Paiement ..> MethodePaiement
 ```
 
 ## Légende
 
 | Symbole | Signification |
 |---------|---------------|
-| `+` | Attribut ou méthode public |
-| `*--` | Composition (l'enfant ne peut exister sans le parent) |
+| `-` / `+` | Attribut privé / méthode publique |
+| `*--` | Composition (l'enfant ne peut exister sans le parent, losange plein côté « tout ») |
 | `-->` | Association dirigée |
-| `"1" ... "0..*"` | Multiplicités (un à zéro-ou-plusieurs) |
-| `<<enumeration>>` | Type énuméré |
-| `enum` | Champ dont le type est une énumération |
-| `Float` | Nombre décimal (prix, notes) |
+| `..>` | Dépendance (utilise le type) |
+| `"1" ... "0..*"` | Multiplicités (lues à l'extrémité opposée) |
+| `<<enumeration>>` | Type énuméré (traduit en `ENUM` MySQL au MPD) |
+| `Decimal` | Nombre décimal exact (prix, notes) — `DECIMAL` en base |
 | `DateTime` | Horodatage complet |
-| `String[]` | Tableau de chaînes (images, tags) |
+| `String[]` | Tableau de chaînes (images, tags) — `JSON` en base |
 
 ### Rôles utilisateur
-- **ACHETEUR** : peut parcourir, acheter, laisser des avis
-- **VENDEUR** : possède une boutique, gère ses produits et commandes
-- **ADMIN** : valide les boutiques, gère les litiges
-- **SUPER_ADMIN** : accès total à la plateforme
+- **CLIENT** : peut parcourir, acheter, laisser des avis
+- **VENDEUR** : possède au plus une boutique, gère ses produits et commandes
+- **ADMIN** : administre la plateforme (utilisateurs, boutiques, litiges)
 
-### Flux de composition clés
-- Une `Commande` ne peut exister sans son `Paiement`
-- Les `LigneCommande` sont détruites si la `Commande` est supprimée
-- Les `Produit` appartiennent à une `Boutique` et disparaissent avec elle
+### Règles de gestion portées par le diagramme
+- Un utilisateur possède **au plus une** boutique (`0..1`).
+- Une `Commande` contient au moins une `LigneCommande` (`1..*`) ; les lignes sont détruites avec la commande (composition ↔ `ON DELETE CASCADE`).
+- Le `Paiement` n'existe qu'une fois la commande réglée (`0..1`) et disparaît avec elle.
+- Les `Produit` appartiennent à une `Boutique` et disparaissent avec elle.
+- Un `Avis` est en composition avec son `Produit` (supprimé avec lui) ; le lien vers `Utilisateur` est une association simple. Un utilisateur ne peut laisser qu'un avis par produit (contrainte UNIQUE au MPD).
+- `LigneCommande` conserve `nomProduit` et `prixUnitaire` en **snapshot** : la facture reste exacte même si le produit change ensuite.

@@ -79,9 +79,9 @@ export default function LoginPage() {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Mot de passe <span className="text-red-500">*</span>
                 </label>
-                <a href="#" className="text-xs text-primary hover:underline">
+                <button type="button" className="text-xs text-primary hover:underline">
                   Mot de passe oublié ?
-                </a>
+                </button>
               </div>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

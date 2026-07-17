@@ -3,6 +3,17 @@
 declare(strict_types=1);
 
 // ---------------------------------------------------------------------------
+// 0. Serveur PHP intégré (php -S ... public/index.php) : servir directement
+//    les fichiers statiques existants (ex. /uploads/xxx.jpg)
+// ---------------------------------------------------------------------------
+if (PHP_SAPI === 'cli-server') {
+    $staticPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    if ($staticPath !== '/' && is_file(__DIR__ . $staticPath)) {
+        return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 1. Chargement de l'environnement (.env manuel, sans dépendance)
 // ---------------------------------------------------------------------------
 $envFile = dirname(__DIR__) . '/.env';

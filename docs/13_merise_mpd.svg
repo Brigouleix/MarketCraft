@@ -1,0 +1,243 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1120" font-family="Segoe UI, Arial, sans-serif">
+
+  <defs>
+    <marker id="refArrow" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
+      <path d="M1,1 L10,5 L1,9" fill="none" stroke="#555" stroke-width="1.3"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1500" height="1120" fill="#ffffff"/>
+
+  <text x="750" y="25" text-anchor="middle" font-size="16" font-weight="bold" fill="#000">
+    Modèle Physique de Données (MPD) — MarketCraft (MySQL / InnoDB)
+  </text>
+
+  <!-- ══════════════ LIENS DE RÉFÉRENCE (FK → table parente) ══════════════ -->
+  <g stroke="#555" stroke-width="1.1" fill="none">
+    <!-- adresses_livraison → utilisateurs -->
+    <line x1="200" y1="360" x2="200" y2="253" marker-end="url(#refArrow)"/>
+    <!-- boutiques → utilisateurs -->
+    <line x1="620" y1="150" x2="347" y2="150" marker-end="url(#refArrow)"/>
+    <!-- categories → categories (auto-référence) -->
+    <polyline points="1445,90 1475,90 1475,35 1300,35 1300,58" marker-end="url(#refArrow)"/>
+    <!-- produits → boutiques -->
+    <line x1="1100" y1="390" x2="907" y2="252" marker-end="url(#refArrow)"/>
+    <!-- produits → categories -->
+    <line x1="1250" y1="330" x2="1270" y2="208" marker-end="url(#refArrow)"/>
+    <!-- commandes → utilisateurs -->
+    <polyline points="400,690 370,690 370,230 347,230" marker-end="url(#refArrow)"/>
+    <!-- commandes → adresses_livraison -->
+    <line x1="400" y1="760" x2="281" y2="538" marker-end="url(#refArrow)"/>
+    <!-- lignes_commande → commandes -->
+    <line x1="800" y1="720" x2="702" y2="720" marker-end="url(#refArrow)"/>
+    <!-- lignes_commande → produits -->
+    <line x1="1085" y1="700" x2="1179" y2="598" marker-end="url(#refArrow)"/>
+    <!-- paiements → commandes -->
+    <line x1="345" y1="930" x2="499" y2="813" marker-end="url(#refArrow)"/>
+    <!-- avis → produits -->
+    <line x1="1300" y1="780" x2="1300" y2="598" marker-end="url(#refArrow)"/>
+    <!-- avis → utilisateurs -->
+    <polyline points="1160,860 30,860 30,150 58,150" marker-end="url(#refArrow)"/>
+    <!-- produit_categorie → produits -->
+    <line x1="1000" y1="136" x2="1178" y2="328" marker-end="url(#refArrow)"/>
+    <!-- produit_categorie → categories -->
+    <line x1="1140" y1="100" x2="1158" y2="100" marker-end="url(#refArrow)"/>
+  </g>
+
+  <!-- ══════════════ TABLE utilisateurs ══════════════ -->
+  <g>
+    <rect x="60" y="60" width="285" height="191" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="60" y1="78" x2="345" y2="78" stroke="#00b3b3" stroke-width="1"/>
+    <text x="202" y="73" text-anchor="middle" font-size="12" font-weight="bold">utilisateurs</text>
+    <g font-size="11">
+      <text x="68" y="91" text-decoration="underline">id</text><text x="200" y="91" text-decoration="underline">int unsigned</text><text x="337" y="91" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="68" y="106">nom</text><text x="200" y="106">varchar(100)</text>
+      <text x="68" y="121">prenom</text><text x="200" y="121">varchar(100)</text>
+      <text x="68" y="136">email</text><text x="200" y="136">varchar(191)</text><text x="337" y="136" text-anchor="end" font-size="10">&lt;ak&gt;</text>
+      <text x="68" y="151">password_hash</text><text x="200" y="151">varchar(255)</text>
+      <text x="68" y="166">role</text><text x="200" y="166">enum</text>
+      <text x="68" y="181">avatar_url</text><text x="200" y="181">varchar(500)</text>
+      <text x="68" y="196">telephone</text><text x="200" y="196">varchar(20)</text>
+      <text x="68" y="211">est_actif</text><text x="200" y="211">tinyint(1)</text>
+      <text x="68" y="226">created_at</text><text x="200" y="226">datetime</text>
+      <text x="68" y="241">updated_at</text><text x="200" y="241">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE categories ══════════════ -->
+  <g>
+    <rect x="1160" y="60" width="285" height="146" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="1160" y1="78" x2="1445" y2="78" stroke="#00b3b3" stroke-width="1"/>
+    <text x="1302" y="73" text-anchor="middle" font-size="12" font-weight="bold">categories</text>
+    <g font-size="11">
+      <text x="1168" y="91" text-decoration="underline">id</text><text x="1300" y="91" text-decoration="underline">int unsigned</text><text x="1437" y="91" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="1168" y="106">parent_id</text><text x="1300" y="106">int unsigned</text><text x="1437" y="106" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="1168" y="121">nom</text><text x="1300" y="121">varchar(100)</text>
+      <text x="1168" y="136">slug</text><text x="1300" y="136">varchar(110)</text><text x="1437" y="136" text-anchor="end" font-size="10">&lt;ak&gt;</text>
+      <text x="1168" y="151">description</text><text x="1300" y="151">text</text>
+      <text x="1168" y="166">image_url</text><text x="1300" y="166">varchar(500)</text>
+      <text x="1168" y="181">ordre</text><text x="1300" y="181">smallint</text>
+      <text x="1168" y="196">created_at</text><text x="1300" y="196">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE produit_categorie (liaison N-N) ══════════════ -->
+  <g>
+    <rect x="930" y="80" width="210" height="56" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="930" y1="98" x2="1140" y2="98" stroke="#00b3b3" stroke-width="1"/>
+    <text x="1035" y="93" text-anchor="middle" font-size="12" font-weight="bold">produit_categorie</text>
+    <g font-size="11">
+      <text x="938" y="111" text-decoration="underline">produit_id</text><text x="1030" y="111" text-decoration="underline">int unsigned</text><text x="1132" y="111" text-anchor="end" font-size="10">&lt;pk,fk&gt;</text>
+      <text x="938" y="126" text-decoration="underline">categorie_id</text><text x="1030" y="126" text-decoration="underline">int unsigned</text><text x="1132" y="126" text-anchor="end" font-size="10">&lt;pk,fk&gt;</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE boutiques ══════════════ -->
+  <g>
+    <rect x="620" y="100" width="285" height="191" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="620" y1="118" x2="905" y2="118" stroke="#00b3b3" stroke-width="1"/>
+    <text x="762" y="113" text-anchor="middle" font-size="12" font-weight="bold">boutiques</text>
+    <g font-size="11">
+      <text x="628" y="131" text-decoration="underline">id</text><text x="760" y="131" text-decoration="underline">int unsigned</text><text x="897" y="131" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="628" y="146">vendeur_id</text><text x="760" y="146">int unsigned</text><text x="897" y="146" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="628" y="161">nom</text><text x="760" y="161">varchar(150)</text>
+      <text x="628" y="176">slug</text><text x="760" y="176">varchar(160)</text><text x="897" y="176" text-anchor="end" font-size="10">&lt;ak&gt;</text>
+      <text x="628" y="191">description</text><text x="760" y="191">text</text>
+      <text x="628" y="206">logo_url</text><text x="760" y="206">varchar(500)</text>
+      <text x="628" y="221">banniere_url</text><text x="760" y="221">varchar(500)</text>
+      <text x="628" y="236">est_active</text><text x="760" y="236">tinyint(1)</text>
+      <text x="628" y="251">note_moyenne</text><text x="760" y="251">decimal(3,2)</text>
+      <text x="628" y="266">created_at</text><text x="760" y="266">datetime</text>
+      <text x="628" y="281">updated_at</text><text x="760" y="281">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE adresses_livraison ══════════════ -->
+  <g>
+    <rect x="60" y="360" width="285" height="176" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="60" y1="378" x2="345" y2="378" stroke="#00b3b3" stroke-width="1"/>
+    <text x="202" y="373" text-anchor="middle" font-size="12" font-weight="bold">adresses_livraison</text>
+    <g font-size="11">
+      <text x="68" y="391" text-decoration="underline">id</text><text x="200" y="391" text-decoration="underline">int unsigned</text><text x="337" y="391" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="68" y="406">utilisateur_id</text><text x="200" y="406">int unsigned</text><text x="337" y="406" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="68" y="421">nom_complet</text><text x="200" y="421">varchar(200)</text>
+      <text x="68" y="436">ligne1</text><text x="200" y="436">varchar(255)</text>
+      <text x="68" y="451">ligne2</text><text x="200" y="451">varchar(255)</text>
+      <text x="68" y="466">ville</text><text x="200" y="466">varchar(100)</text>
+      <text x="68" y="481">code_postal</text><text x="200" y="481">varchar(20)</text>
+      <text x="68" y="496">pays</text><text x="200" y="496">varchar(100)</text>
+      <text x="68" y="511">est_principale</text><text x="200" y="511">tinyint(1)</text>
+      <text x="68" y="526">created_at</text><text x="200" y="526">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE produits ══════════════ -->
+  <g>
+    <rect x="1100" y="330" width="300" height="266" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="1100" y1="348" x2="1400" y2="348" stroke="#00b3b3" stroke-width="1"/>
+    <text x="1250" y="343" text-anchor="middle" font-size="12" font-weight="bold">produits</text>
+    <g font-size="11">
+      <text x="1108" y="361" text-decoration="underline">id</text><text x="1250" y="361" text-decoration="underline">int unsigned</text><text x="1392" y="361" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="1108" y="376">boutique_id</text><text x="1250" y="376">int unsigned</text><text x="1392" y="376" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="1108" y="391">categorie_id</text><text x="1250" y="391">int unsigned</text><text x="1392" y="391" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="1108" y="406">nom</text><text x="1250" y="406">varchar(200)</text>
+      <text x="1108" y="421">slug</text><text x="1250" y="421">varchar(220)</text><text x="1392" y="421" text-anchor="end" font-size="10">&lt;ak&gt;</text>
+      <text x="1108" y="436">description</text><text x="1250" y="436">text</text>
+      <text x="1108" y="451">prix</text><text x="1250" y="451">decimal(10,2)</text>
+      <text x="1108" y="466">stock</text><text x="1250" y="466">int</text>
+      <text x="1108" y="481">note_moyenne</text><text x="1250" y="481">decimal(3,2)</text>
+      <text x="1108" y="496">nombre_avis</text><text x="1250" y="496">int unsigned</text>
+      <text x="1108" y="511">images</text><text x="1250" y="511">json</text>
+      <text x="1108" y="526">tags</text><text x="1250" y="526">json</text>
+      <text x="1108" y="541">est_actif</text><text x="1250" y="541">tinyint(1)</text>
+      <text x="1108" y="556">est_fait_main</text><text x="1250" y="556">tinyint(1)</text>
+      <text x="1108" y="571">created_at</text><text x="1250" y="571">datetime</text>
+      <text x="1108" y="586">updated_at</text><text x="1250" y="586">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE commandes ══════════════ -->
+  <g>
+    <rect x="400" y="620" width="300" height="191" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="400" y1="638" x2="700" y2="638" stroke="#00b3b3" stroke-width="1"/>
+    <text x="550" y="633" text-anchor="middle" font-size="12" font-weight="bold">commandes</text>
+    <g font-size="11">
+      <text x="408" y="651" text-decoration="underline">id</text><text x="560" y="651" text-decoration="underline">int unsigned</text><text x="692" y="651" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="408" y="666">utilisateur_id</text><text x="560" y="666">int unsigned</text><text x="692" y="666" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="408" y="681">adresse_livraison_id</text><text x="560" y="681">int unsigned</text><text x="692" y="681" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="408" y="696">statut</text><text x="560" y="696">enum</text>
+      <text x="408" y="711">montant_total</text><text x="560" y="711">decimal(10,2)</text>
+      <text x="408" y="726">frais_livraison</text><text x="560" y="726">decimal(10,2)</text>
+      <text x="408" y="741">note</text><text x="560" y="741">text</text>
+      <text x="408" y="756">numero_suivi</text><text x="560" y="756">varchar(100)</text>
+      <text x="408" y="771">date_livraison</text><text x="560" y="771">datetime</text>
+      <text x="408" y="786">created_at</text><text x="560" y="786">datetime</text>
+      <text x="408" y="801">updated_at</text><text x="560" y="801">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE lignes_commande ══════════════ -->
+  <g>
+    <rect x="800" y="680" width="285" height="116" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="800" y1="698" x2="1085" y2="698" stroke="#00b3b3" stroke-width="1"/>
+    <text x="942" y="693" text-anchor="middle" font-size="12" font-weight="bold">lignes_commande</text>
+    <g font-size="11">
+      <text x="808" y="711" text-decoration="underline">id</text><text x="940" y="711" text-decoration="underline">int unsigned</text><text x="1077" y="711" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="808" y="726">commande_id</text><text x="940" y="726">int unsigned</text><text x="1077" y="726" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="808" y="741">produit_id</text><text x="940" y="741">int unsigned</text><text x="1077" y="741" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="808" y="756">quantite</text><text x="940" y="756">smallint</text>
+      <text x="808" y="771">prix_unitaire</text><text x="940" y="771">decimal(10,2)</text>
+      <text x="808" y="786">nom_produit</text><text x="940" y="786">varchar(200)</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE paiements ══════════════ -->
+  <g>
+    <rect x="60" y="900" width="285" height="176" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="60" y1="918" x2="345" y2="918" stroke="#00b3b3" stroke-width="1"/>
+    <text x="202" y="913" text-anchor="middle" font-size="12" font-weight="bold">paiements</text>
+    <g font-size="11">
+      <text x="68" y="931" text-decoration="underline">id</text><text x="200" y="931" text-decoration="underline">int unsigned</text><text x="337" y="931" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="68" y="946">commande_id</text><text x="200" y="946">int unsigned</text><text x="337" y="946" text-anchor="end" font-size="10">&lt;fk&gt;</text>
+      <text x="68" y="961">methode</text><text x="200" y="961">enum</text>
+      <text x="68" y="976">statut</text><text x="200" y="976">enum</text>
+      <text x="68" y="991">montant</text><text x="200" y="991">decimal(10,2)</text>
+      <text x="68" y="1006">transaction_id</text><text x="200" y="1006">varchar(255)</text>
+      <text x="68" y="1021">date_liberation</text><text x="200" y="1021">datetime</text>
+      <text x="68" y="1036">payload</text><text x="200" y="1036">json</text>
+      <text x="68" y="1051">created_at</text><text x="200" y="1051">datetime</text>
+      <text x="68" y="1066">updated_at</text><text x="200" y="1066">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ TABLE avis ══════════════ -->
+  <g>
+    <rect x="1160" y="780" width="285" height="146" fill="#ccffff" stroke="#00b3b3" stroke-width="1.2"/>
+    <line x1="1160" y1="798" x2="1445" y2="798" stroke="#00b3b3" stroke-width="1"/>
+    <text x="1302" y="793" text-anchor="middle" font-size="12" font-weight="bold">avis</text>
+    <g font-size="11">
+      <text x="1168" y="811" text-decoration="underline">id</text><text x="1300" y="811" text-decoration="underline">int unsigned</text><text x="1437" y="811" text-anchor="end" font-size="10">&lt;pk&gt;</text>
+      <text x="1168" y="826">produit_id</text><text x="1300" y="826">int unsigned</text><text x="1437" y="826" text-anchor="end" font-size="10">&lt;fk,ak&gt;</text>
+      <text x="1168" y="841">utilisateur_id</text><text x="1300" y="841">int unsigned</text><text x="1437" y="841" text-anchor="end" font-size="10">&lt;fk,ak&gt;</text>
+      <text x="1168" y="856">note</text><text x="1300" y="856">tinyint</text>
+      <text x="1168" y="871">titre</text><text x="1300" y="871">varchar(150)</text>
+      <text x="1168" y="886">commentaire</text><text x="1300" y="886">text</text>
+      <text x="1168" y="901">est_verifie</text><text x="1300" y="901">tinyint(1)</text>
+      <text x="1168" y="916">created_at</text><text x="1300" y="916">datetime</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ ENCART COMPOSANTS SGBD ══════════════ -->
+  <g>
+    <path d="M430,900 L1015,900 L1030,915 L1030,1005 L430,1005 Z" fill="#ffffe0" stroke="#b0a860" stroke-width="1"/>
+    <path d="M1015,900 L1015,915 L1030,915" fill="none" stroke="#b0a860" stroke-width="1"/>
+    <text x="440" y="916" font-size="11.5" font-weight="bold">Composants SGBD (CP8)</text>
+    <g font-size="10.5">
+      <text x="440" y="933">Triggers : trg_avis_after_insert / _update / _delete → recalcul de note_moyenne et nombre_avis (produits)</text>
+      <text x="440" y="948">Trigger : trg_produits_after_update_note → répercute la note moyenne des produits sur boutiques</text>
+      <text x="440" y="963">Fonction : fn_stock_suffisant(produit_id, quantite) → contrôle du stock avant ligne de commande</text>
+      <text x="440" y="978">Procédure : sp_liberer_paiements_echus() → passe les paiements à « libere » à J+14 après livraison</text>
+      <text x="440" y="993">Event : evt_liberation_paiements_quotidien → exécute la procédure chaque jour</text>
+    </g>
+  </g>
+</svg>

@@ -2,6 +2,10 @@
 
 Description : Le MCD représente les entités du monde réel de MarketCraft et leurs associations, indépendamment de toute considération technique d'implémentation. Il exprime les règles de gestion métier sous forme de cardinalités et d'associations nommées.
 
+> **Version Merise classique** : une version synthétique au format PowerAMC (entités avec identifiants `<pi>`, associations en capsules avec cardinalités, associations porteuses d'attributs) est disponible dans [`08_merise_mcd.svg`](08_merise_mcd.svg).
+
+![MCD Merise MarketCraft](08_merise_mcd.svg)
+
 ```mermaid
 erDiagram
     UTILISATEUR {
@@ -154,7 +158,7 @@ erDiagram
 
     BOUTIQUE ||--o{ PRODUIT : "possède (1,1)-(1,N)"
 
-    CATEGORIE ||--o{ PRODUIT : "classe (1,1)-(0,N)"
+    CATEGORIE }o--o{ PRODUIT : "classe (0,N)-(0,N)"
     CATEGORIE |o--o{ CATEGORIE : "contient sous-catégories (0,1)-(0,N)"
 
     COMMANDE ||--o{ LIGNE_COMMANDE : "composée de (1,1)-(1,N)"
@@ -177,7 +181,7 @@ erDiagram
 | **passe** | UTILISATEUR | (1,1) | COMMANDE | (0,N) | Un utilisateur peut passer zéro ou plusieurs commandes ; chaque commande appartient à un seul acheteur |
 | **rédige** | UTILISATEUR | (1,1) | AVIS | (0,N) | Un utilisateur peut rédiger plusieurs avis ; chaque avis est écrit par un seul utilisateur |
 | **possède** | BOUTIQUE | (1,1) | PRODUIT | (1,N) | Une boutique possède au moins un produit ; chaque produit appartient à une seule boutique |
-| **classe** | CATEGORIE | (1,1) | PRODUIT | (0,N) | Une catégorie peut contenir zéro ou plusieurs produits ; chaque produit appartient à une seule catégorie |
+| **classe** | CATEGORIE | (0,N) | PRODUIT | (0,N) | Une catégorie peut contenir zéro ou plusieurs produits ; un produit peut appartenir à plusieurs catégories (la première sélectionnée est la catégorie principale) |
 | **composée de** | COMMANDE | (1,1) | LIGNE_COMMANDE | (1,N) | Une commande est composée d'au moins une ligne ; chaque ligne appartient à une seule commande |
 | **réglée par** | COMMANDE | (1,1) | PAIEMENT | (1,1) | Une commande a exactement un paiement et vice versa |
 | **livrée à** | COMMANDE | (0,N) | ADRESSE_LIVRAISON | (1,1) | Une adresse peut servir pour plusieurs commandes ; chaque commande a une seule adresse de livraison |

@@ -50,6 +50,8 @@ export default function ProductsPage() {
   });
 
   const [localSearch, setLocalSearch] = useState(filters.search);
+  // Saisie locale des prix, appliquée au blur / Entrée (évite une requête par frappe)
+  const [localPrix, setLocalPrix] = useState({ min: filters.prix_min, max: filters.prix_max });
 
   // Sync URL params → filters
   useEffect(() => {
@@ -63,6 +65,10 @@ export default function ProductsPage() {
       page: Number(searchParams.get('page')) || 1,
     });
     setLocalSearch(searchParams.get('search') || '');
+    setLocalPrix({
+      min: searchParams.get('prix_min') || '',
+      max: searchParams.get('prix_max') || '',
+    });
   }, [searchParams]);
 
   const { data, isLoading, isError } = useProducts(filters);
@@ -90,13 +96,21 @@ export default function ProductsPage() {
   const totalPages = data?.pagination?.total_pages || data?.last_page || data?.meta?.last_page || 1;
   const totalItems = data?.pagination?.total ?? data?.total ?? data?.meta?.total ?? mockProducts.length;
 
-  const updateFilter = (key, value) => {
+  // Applique un ou plusieurs filtres d'un coup (un seul setSearchParams,
+  // sinon deux appels successifs s'écrasent mutuellement)
+  const updateFilters = (updates) => {
     const newParams = new URLSearchParams(searchParams);
-    if (value === '' || value === 0) newParams.delete(key);
-    else newParams.set(key, value);
-    if (key !== 'page') newParams.delete('page');
+    let pageChange = false;
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === '' || value === 0) newParams.delete(key);
+      else newParams.set(key, value);
+      if (key === 'page') pageChange = true;
+    });
+    if (!pageChange) newParams.delete('page');
     setSearchParams(newParams);
   };
+
+  const updateFilter = (key, value) => updateFilters({ [key]: value });
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -110,8 +124,14 @@ export default function ProductsPage() {
 
   const hasActiveFilters = filters.search || filters.categorie || filters.prix_min || filters.prix_max || filters.note_min > 0;
 
-  // Sidebar component
-  const Sidebar = () => (
+  // Applique les prix saisis localement aux filtres URL
+  const applyPrix = () =>
+    updateFilters({ prix_min: localPrix.min.trim(), prix_max: localPrix.max.trim() });
+
+  // JSX de la sidebar (constante, PAS un composant inline : un composant
+  // défini dans le rendu serait remonté à chaque frappe et les champs
+  // perdraient le focus)
+  const sidebar = (
     <aside className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-serif font-bold text-lg text-primary">Filtres</h2>
@@ -160,8 +180,10 @@ export default function ProductsPage() {
           <input
             type="number"
             placeholder="Min"
-            value={filters.prix_min}
-            onChange={(e) => updateFilter('prix_min', e.target.value)}
+            value={localPrix.min}
+            onChange={(e) => setLocalPrix((p) => ({ ...p, min: e.target.value }))}
+            onBlur={applyPrix}
+            onKeyDown={(e) => e.key === 'Enter' && applyPrix()}
             min={0}
             className="input-field text-sm py-2"
           />
@@ -169,8 +191,10 @@ export default function ProductsPage() {
           <input
             type="number"
             placeholder="Max"
-            value={filters.prix_max}
-            onChange={(e) => updateFilter('prix_max', e.target.value)}
+            value={localPrix.max}
+            onChange={(e) => setLocalPrix((p) => ({ ...p, max: e.target.value }))}
+            onBlur={applyPrix}
+            onKeyDown={(e) => e.key === 'Enter' && applyPrix()}
             min={0}
             className="input-field text-sm py-2"
           />
@@ -270,7 +294,7 @@ export default function ProductsPage() {
           {(filters.prix_min || filters.prix_max) && (
             <span className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full">
               {filters.prix_min || '0'}€ – {filters.prix_max || '∞'}€
-              <button onClick={() => { updateFilter('prix_min', ''); updateFilter('prix_max', ''); }}><X size={11} /></button>
+              <button onClick={() => updateFilters({ prix_min: '', prix_max: '' })}><X size={11} /></button>
             </span>
           )}
           {filters.note_min > 0 && (
@@ -286,7 +310,7 @@ export default function ProductsPage() {
         {/* Desktop Sidebar */}
         <div className="hidden lg:block w-56 flex-shrink-0">
           <div className="card p-5 sticky top-20">
-            <Sidebar />
+            {sidebar}
           </div>
         </div>
 
@@ -301,7 +325,7 @@ export default function ProductsPage() {
                   <X size={20} className="text-gray-500" />
                 </button>
               </div>
-              <Sidebar />
+              {sidebar}
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="btn-primary w-full mt-6"

@@ -126,6 +126,8 @@ class ProductController extends Controller
             $product = $this->productModel->create([
                 'boutique_id'   => $boutiqueId,
                 'categorie_id'  => isset($body['categorie_id']) ? (int) $body['categorie_id'] : null,
+                'categorie_ids' => isset($body['categorie_ids']) && is_array($body['categorie_ids'])
+                    ? $body['categorie_ids'] : null,
                 'nom'           => $body['nom'],
                 'description'   => $body['description'] ?? null,
                 'prix'          => (float) $body['prix'],
