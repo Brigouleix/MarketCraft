@@ -92,7 +92,7 @@ jobs:
           cache-dependency-path: marketcraft-mobile/package-lock.json
 
       - name: Installer les dépendances
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Exécuter les tests
         run: npm test -- --watchAll=false

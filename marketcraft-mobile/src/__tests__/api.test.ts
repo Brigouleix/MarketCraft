@@ -13,7 +13,7 @@ jest.mock('axios', () => {
       response: { use: jest.fn() },
     },
   };
-  return { default: mockAxios, ...mockAxios };
+  return { __esModule: true, default: mockAxios, ...mockAxios };
 });
 
 // Mock AsyncStorage
