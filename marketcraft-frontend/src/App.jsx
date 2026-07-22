@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
 import ProtectedRoute from './components/ProtectedRoute';
+import CookieConsent from './components/CookieConsent';
 
 // Lazy-load pages
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -19,6 +20,9 @@ const BoutiquesPage = lazy(() => import('./pages/BoutiquesPage'));
 const BoutiquePage = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const BuyerStatsPage = lazy(() => import('./pages/BuyerStatsPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
+const LegalNoticePage = lazy(() => import('./pages/LegalNoticePage'));
 
 function PageLoader() {
   return (
@@ -46,6 +50,11 @@ export default function App() {
             <Route path="/boutiques/:id" element={<BoutiquePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+
+            {/* Pages légales */}
+            <Route path="/confidentialite" element={<PrivacyPolicyPage />} />
+            <Route path="/cookies" element={<CookiePolicyPage />} />
+            <Route path="/mentions-legales" element={<LegalNoticePage />} />
 
             {/* Protected routes */}
             <Route
@@ -112,6 +121,7 @@ export default function App() {
         </Suspense>
       </main>
       <Footer />
+      <CookieConsent />
     </div>
   );
 }
