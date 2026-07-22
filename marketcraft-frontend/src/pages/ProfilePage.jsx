@@ -13,6 +13,12 @@ import {
   XCircle,
   AlertCircle,
   Package,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import { authAPI, ordersAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -28,7 +34,7 @@ const STATUS_CONFIG = {
 
 const MOCK_ORDERS = Array.from({ length: 4 }, (_, i) => ({
   id: 10024 + i,
-  total: [87.5, 145.0, 32.0, 210.9][i],
+  montant_total: [87.5, 145.0, 32.0, 210.9][i],
   statut: ['livree', 'expediee', 'confirmee', 'en_attente'][i],
   created_at: new Date(Date.now() - i * 86400000 * 10).toISOString(),
   nb_articles: [2, 3, 1, 4][i],
@@ -62,6 +68,19 @@ export default function ProfilePage() {
   });
   const [errors, setErrors] = useState({});
   const [activeTab, setActiveTab] = useState('infos');
+
+  // Changement de mot de passe
+  const [pwForm, setPwForm] = useState({
+    current_password: '',
+    password: '',
+    password_confirm: '',
+  });
+  const [pwErrors, setPwErrors] = useState({});
+  const [showPw, setShowPw] = useState(false);
+
+  // Suppression de compte
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
 
   // Resynchronise le formulaire dès que les infos utilisateur arrivent ou
   // changent (ex. chargement asynchrone via /me après un rafraîchissement
@@ -131,6 +150,68 @@ export default function ProfilePage() {
     await logout();
     navigate('/');
   };
+
+  // ── Changement de mot de passe ──────────────────────────────────────
+  const passwordMutation = useMutation({
+    mutationFn: () =>
+      authAPI.updateMe({
+        current_password: pwForm.current_password,
+        password: pwForm.password,
+      }),
+    onSuccess: () => {
+      toast.success('Mot de passe modifié !');
+      setPwForm({ current_password: '', password: '', password_confirm: '' });
+      setPwErrors({});
+    },
+    onError: (err) => {
+      const status = err?.response?.status;
+      if (status === 403) {
+        setPwErrors({ current_password: 'Mot de passe actuel incorrect.' });
+      } else if (status === 422) {
+        setPwErrors({ password: 'Le mot de passe doit contenir au moins 8 caractères.' });
+      } else {
+        toast.error('Échec de la modification du mot de passe.');
+      }
+    },
+  });
+
+  const handlePwChange = (e) => {
+    const { name, value } = e.target;
+    setPwForm((prev) => ({ ...prev, [name]: value }));
+    if (pwErrors[name]) setPwErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const handlePwSubmit = (e) => {
+    e.preventDefault();
+    const errs = {};
+    if (!pwForm.current_password) errs.current_password = 'Mot de passe actuel requis.';
+    if (pwForm.password.length < 8) errs.password = 'Au moins 8 caractères.';
+    if (pwForm.password !== pwForm.password_confirm)
+      errs.password_confirm = 'Les mots de passe ne correspondent pas.';
+    if (Object.keys(errs).length > 0) {
+      setPwErrors(errs);
+      return;
+    }
+    passwordMutation.mutate();
+  };
+
+  // ── Suppression de compte ───────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: () => authAPI.deleteMe({ password: deletePassword }),
+    onSuccess: async () => {
+      toast.success('Compte supprimé.');
+      await logout();
+      navigate('/');
+    },
+    onError: (err) => {
+      const status = err?.response?.status;
+      if (status === 403) {
+        toast.error('Mot de passe incorrect.');
+      } else {
+        toast.error('Échec de la suppression du compte.');
+      }
+    },
+  });
 
   const tabs = [
     { key: 'infos', label: 'Mes informations', icon: User },
@@ -297,18 +378,154 @@ export default function ProfilePage() {
             </form>
           </div>
 
-          {/* Danger zone */}
+          {/* Changement de mot de passe */}
+          <div className="card p-6 mt-6">
+            <h2 className="font-serif font-bold text-lg text-gray-800 mb-5 flex items-center gap-2">
+              <KeyRound size={18} className="text-primary" /> Changer le mot de passe
+            </h2>
+
+            <form onSubmit={handlePwSubmit} className="space-y-5" noValidate>
+              {[
+                { name: 'current_password', label: 'Mot de passe actuel', ac: 'current-password' },
+                { name: 'password', label: 'Nouveau mot de passe', ac: 'new-password' },
+                { name: 'password_confirm', label: 'Confirmer le nouveau mot de passe', ac: 'new-password' },
+              ].map(({ name, label, ac }) => (
+                <div key={name}>
+                  <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {label} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Lock
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                      id={name}
+                      name={name}
+                      type={showPw ? 'text' : 'password'}
+                      value={pwForm[name]}
+                      onChange={handlePwChange}
+                      autoComplete={ac}
+                      className={`input-field pl-9 pr-9 ${pwErrors[name] ? 'border-red-400' : ''}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      aria-label={showPw ? 'Masquer les mots de passe' : 'Afficher les mots de passe'}
+                    >
+                      {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                  {pwErrors[name] && (
+                    <p className="text-red-500 text-xs mt-1">{pwErrors[name]}</p>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="submit"
+                disabled={passwordMutation.isPending}
+                className="btn-primary w-full flex items-center justify-center gap-2 py-3"
+              >
+                {passwordMutation.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Modification…
+                  </>
+                ) : (
+                  <>
+                    <KeyRound size={16} /> Modifier le mot de passe
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Zone de danger */}
           <div className="card p-5 mt-6 border-red-200">
-            <h3 className="font-semibold text-red-700 text-sm mb-3">Zone de danger</h3>
-            <p className="text-xs text-gray-500 mb-3">
-              La déconnexion effacera votre session sur cet appareil.
-            </p>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-sm text-red-600 border border-red-300 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors"
-            >
-              <LogOut size={15} /> Se déconnecter
-            </button>
+            <h3 className="font-semibold text-red-700 text-sm mb-4 flex items-center gap-2">
+              <ShieldAlert size={16} /> Zone de danger
+            </h3>
+
+            <div className="flex flex-col gap-4">
+              {/* Déconnexion */}
+              <div>
+                <p className="text-xs text-gray-500 mb-2">
+                  La déconnexion effacera votre session sur cet appareil.
+                </p>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-sm text-red-600 border border-red-300 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <LogOut size={15} /> Se déconnecter
+                </button>
+              </div>
+
+              {/* Suppression du compte */}
+              <div className="border-t border-red-100 pt-4">
+                <p className="text-xs text-gray-500 mb-2">
+                  La suppression désactive définitivement votre compte. Cette action est
+                  irréversible.
+                </p>
+
+                {!confirmDelete ? (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-2 text-sm text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={15} /> Supprimer mon compte
+                  </button>
+                ) : (
+                  <div className="space-y-3 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm text-red-700 font-medium">
+                      Confirmez avec votre mot de passe pour supprimer votre compte.
+                    </p>
+                    <div className="relative">
+                      <Lock
+                        size={15}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      />
+                      <input
+                        type="password"
+                        value={deletePassword}
+                        onChange={(e) => setDeletePassword(e.target.value)}
+                        placeholder="Votre mot de passe"
+                        autoComplete="current-password"
+                        className="input-field pl-9"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => deleteMutation.mutate()}
+                        disabled={!deletePassword || deleteMutation.isPending}
+                        className="flex items-center gap-2 text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors"
+                      >
+                        {deleteMutation.isPending ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Suppression…
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 size={15} /> Confirmer la suppression
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setConfirmDelete(false);
+                          setDeletePassword('');
+                        }}
+                        className="text-sm text-gray-600 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -376,7 +593,7 @@ export default function ProfilePage() {
                         {(order.nb_articles || 1) > 1 ? 's' : ''}
                       </td>
                       <td className="px-5 py-4 font-semibold text-primary">
-                        {Number(order.total).toFixed(2)} €
+                        {Number(order.montant_total ?? order.total ?? 0).toFixed(2)} €
                       </td>
                       <td className="px-5 py-4">
                         <StatusBadge statut={order.statut} />

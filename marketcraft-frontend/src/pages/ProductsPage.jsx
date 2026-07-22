@@ -7,7 +7,7 @@ import ProductCard from '../components/ProductCard';
 
 // Secours si l'API catégories est indisponible (et pour les produits mock)
 const CATEGORIES = [
-  'bijoux', 'ceramique', 'mode', 'decoration', 'floral', 'art', 'textile', 'papeterie', 'cuisine', 'autre',
+  'bois', 'ceramique', 'bijoux', 'textile', 'decoration-maison', 'menuiserie', 'poterie', 'accessoires', 'couture',
 ];
 
 const TRI_OPTIONS = [
@@ -112,6 +112,17 @@ export default function ProductsPage() {
 
   const updateFilter = (key, value) => updateFilters({ [key]: value });
 
+  // Catégories sélectionnées : le paramètre "categorie" est une liste de slugs
+  // séparés par des virgules (multi-sélection).
+  const selectedCategories = filters.categorie ? filters.categorie.split(',').filter(Boolean) : [];
+
+  const toggleCategorie = (slug) => {
+    const next = selectedCategories.includes(slug)
+      ? selectedCategories.filter((s) => s !== slug)
+      : [...selectedCategories, slug];
+    updateFilter('categorie', next.join(','));
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     updateFilter('search', localSearch.trim());
@@ -142,30 +153,28 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Category */}
+      {/* Category (multi-sélection : une case par ligne) */}
       <div>
-        <h3 className="font-semibold text-sm text-gray-700 mb-3">Catégorie</h3>
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="categorie"
-              value=""
-              checked={!filters.categorie}
-              onChange={() => updateFilter('categorie', '')}
-              className="text-primary"
-            />
-            <span className="text-sm text-gray-700">Toutes</span>
-          </label>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700">Catégories</h3>
+          {selectedCategories.length > 0 && (
+            <button
+              onClick={() => updateFilter('categorie', '')}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Tout décocher
+            </button>
+          )}
+        </div>
+        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
           {categories.map((cat) => (
             <label key={cat.slug} className="flex items-center gap-2 cursor-pointer">
               <input
-                type="radio"
-                name="categorie"
+                type="checkbox"
                 value={cat.slug}
-                checked={filters.categorie === cat.slug}
-                onChange={() => updateFilter('categorie', cat.slug)}
-                className="text-primary"
+                checked={selectedCategories.includes(cat.slug)}
+                onChange={() => toggleCategorie(cat.slug)}
+                className="rounded text-primary focus:ring-primary"
               />
               <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
             </label>
@@ -285,12 +294,15 @@ export default function ProductsPage() {
               <button onClick={() => { updateFilter('search', ''); setLocalSearch(''); }}><X size={11} /></button>
             </span>
           )}
-          {filters.categorie && (
-            <span className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full capitalize">
-              {filters.categorie}
-              <button onClick={() => updateFilter('categorie', '')}><X size={11} /></button>
-            </span>
-          )}
+          {selectedCategories.map((slug) => {
+            const cat = categories.find((c) => c.slug === slug);
+            return (
+              <span key={slug} className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full capitalize">
+                {cat?.nom || slug}
+                <button onClick={() => toggleCategorie(slug)}><X size={11} /></button>
+              </span>
+            );
+          })}
           {(filters.prix_min || filters.prix_max) && (
             <span className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full">
               {filters.prix_min || '0'}€ – {filters.prix_max || '∞'}€

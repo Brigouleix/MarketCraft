@@ -264,28 +264,21 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Catégories <span className="text-gray-400 font-normal">(plusieurs choix possibles)</span>
             </label>
-            <div className="flex flex-wrap gap-2 p-3 border border-secondary-300 rounded-lg bg-secondary-50 max-h-32 overflow-y-auto">
-              {categories.map((cat) => {
-                const checked = form.categorie_ids.includes(cat.id);
-                return (
-                  <label
-                    key={cat.id}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs cursor-pointer border transition-colors ${
-                      checked
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-gray-700 border-secondary-300 hover:border-primary'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleCategorie(cat.id)}
-                      className="sr-only"
-                    />
-                    {cat.nom}
-                  </label>
-                );
-              })}
+            <div className="space-y-1 p-3 border border-secondary-300 rounded-lg bg-secondary-50 max-h-40 overflow-y-auto">
+              {categories.map((cat) => (
+                <label
+                  key={cat.id}
+                  className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-secondary-100"
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.categorie_ids.includes(cat.id)}
+                    onChange={() => toggleCategorie(cat.id)}
+                    className="rounded text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
+                </label>
+              ))}
             </div>
             {form.categorie_ids.length > 1 && (
               <p className="text-xs text-gray-400 mt-1">

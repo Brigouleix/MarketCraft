@@ -7,6 +7,8 @@ import {
   X,
   LogOut,
   LayoutDashboard,
+  ShieldCheck,
+  BarChart3,
   UserCircle,
   ChevronDown,
   Hammer,
@@ -22,7 +24,7 @@ const navLinks = [
 
 export default function Navbar() {
   const { count, setIsOpen: openCart } = useContext(CartContext);
-  const { user, isAuthenticated, isVendeur, logout } = useAuth();
+  const { user, isAuthenticated, isVendeur, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -149,6 +151,13 @@ export default function Navbar() {
                     >
                       <UserCircle size={16} /> Mon profil
                     </Link>
+                    <Link
+                      to="/mes-stats"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary-100 hover:text-primary transition-colors"
+                    >
+                      <BarChart3 size={16} /> Mes statistiques
+                    </Link>
                     {isVendeur && (
                       <Link
                         to="/dashboard"
@@ -156,6 +165,15 @@ export default function Navbar() {
                         className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary-100 hover:text-primary transition-colors"
                       >
                         <LayoutDashboard size={16} /> Dashboard
+                      </Link>
+                    )}
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary-100 hover:text-primary transition-colors"
+                      >
+                        <ShieldCheck size={16} /> Administration
                       </Link>
                     )}
                     <hr className="my-1 border-secondary-200" />
@@ -235,6 +253,13 @@ export default function Navbar() {
               >
                 <UserCircle size={16} /> Mon profil
               </Link>
+              <Link
+                to="/mes-stats"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-secondary-100"
+              >
+                <BarChart3 size={16} /> Mes statistiques
+              </Link>
               {isVendeur && (
                 <Link
                   to="/dashboard"
@@ -242,6 +267,15 @@ export default function Navbar() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-secondary-100"
                 >
                   <LayoutDashboard size={16} /> Dashboard
+                </Link>
+              )}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-secondary-100"
+                >
+                  <ShieldCheck size={16} /> Administration
                 </Link>
               )}
               <button

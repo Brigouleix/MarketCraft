@@ -22,10 +22,17 @@ export default function ProductCard({ product }) {
     nb_avis = 0,
     stock = 0,
     categorie,
+    categories,
   } = product;
 
   const imageUrl = image || parseImages(images)[0] || PLACEHOLDER_IMG;
   const inStock = stock > 0;
+
+  // Toutes les catégories du produit (liaison N-N) ; repli sur la catégorie
+  // principale (string) si la liste n'est pas fournie par l'API.
+  const categoryNames = Array.isArray(categories) && categories.length > 0
+    ? categories.map((c) => c.nom)
+    : (categorie ? [categorie] : []);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -50,10 +57,25 @@ export default function ProductCard({ product }) {
             </span>
           </div>
         )}
-        {categorie && (
-          <span className="absolute top-2 left-2 bg-accent text-white text-xs font-medium px-2 py-0.5 rounded-full">
-            {categorie}
-          </span>
+        {categoryNames.length > 0 && (
+          <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1">
+            {categoryNames.slice(0, 2).map((name) => (
+              <span
+                key={name}
+                className="bg-accent text-white text-xs font-medium px-2 py-0.5 rounded-full"
+              >
+                {name}
+              </span>
+            ))}
+            {categoryNames.length > 2 && (
+              <span
+                className="bg-accent text-white text-xs font-medium px-2 py-0.5 rounded-full"
+                title={categoryNames.slice(2).join(', ')}
+              >
+                +{categoryNames.length - 2}
+              </span>
+            )}
+          </div>
         )}
       </Link>
 

@@ -212,8 +212,9 @@ class AuthController extends Controller
         $userId = (int) $authPayload['sub'];
 
         $errors = $this->validate($body, [
-            'nom'    => 'min:2|max:100',
-            'prenom' => 'min:2|max:100',
+            'nom'      => 'min:2|max:100',
+            'prenom'   => 'min:2|max:100',
+            'password' => 'min:8|max:255',
         ]);
 
         if (!empty($errors)) {
@@ -243,5 +244,42 @@ class AuthController extends Controller
         }
 
         $this->success($user, 'Profile updated successfully.');
+    }
+
+    /**
+     * DELETE /auth/me — Suppression (désactivation) du compte de l'utilisateur connecté.
+     * Le mot de passe courant est exigé pour confirmer l'opération.
+     */
+    public function deleteMe(array $params = []): void
+    {
+        $authPayload = Auth::getCurrentUser();
+
+        if ($authPayload === null) {
+            $this->error('Unauthorized.', 401);
+            return;
+        }
+
+        $body   = $this->getBody();
+        $userId = (int) $authPayload['sub'];
+
+        // Confirmation par mot de passe obligatoire
+        if (empty($body['password'])) {
+            $this->error('Password is required to delete your account.', 422);
+            return;
+        }
+
+        $currentUser = $this->userModel->findByEmail($authPayload['email']);
+        if ($currentUser === null
+            || !$this->userModel->verifyPassword($body['password'], $currentUser['password_hash'])) {
+            $this->error('Password is incorrect.', 403);
+            return;
+        }
+
+        if (!$this->userModel->delete($userId)) {
+            $this->error('Account deletion failed.', 500);
+            return;
+        }
+
+        $this->success(null, 'Account deleted successfully.');
     }
 }

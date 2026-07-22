@@ -14,6 +14,7 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 const BoutiquesPage = lazy(() => import('./pages/BoutiquesPage'));
 const BoutiquePage = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -84,6 +85,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <BuyerStatsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminPage />
                 </ProtectedRoute>
               }
             />

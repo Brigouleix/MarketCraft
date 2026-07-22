@@ -18,6 +18,7 @@ use App\Controllers\AvisController;
 use App\Controllers\CategorieController;
 use App\Controllers\DashboardController;
 use App\Controllers\UploadController;
+use App\Controllers\AdminController;
 
 // =========================================================================
 // AUTH
@@ -40,6 +41,9 @@ $router->get('/auth/me', [AuthController::class, 'me'], ['auth']);
 
 // PUT  /auth/me        – Mise à jour du profil
 $router->put('/auth/me', [AuthController::class, 'updateMe'], ['auth']);
+
+// DELETE /auth/me      – Suppression (désactivation) du compte
+$router->delete('/auth/me', [AuthController::class, 'deleteMe'], ['auth']);
 
 // =========================================================================
 // PRODUITS
@@ -141,6 +145,31 @@ $router->post('/upload/image', [UploadController::class, 'image'], ['auth']);
 
 // POST /upload/images  – Upload multiple (JWT)
 $router->post('/upload/images', [UploadController::class, 'images'], ['auth']);
+
+// =========================================================================
+// ADMINISTRATION (JWT + rôle admin vérifié dans le contrôleur)
+// =========================================================================
+
+// GET    /admin/stats                – Statistiques globales
+$router->get('/admin/stats', [AdminController::class, 'stats'], ['auth']);
+
+// GET    /admin/users                – Liste des utilisateurs
+$router->get('/admin/users', [AdminController::class, 'users'], ['auth']);
+
+// PUT    /admin/users/:id/toggle     – Activer / désactiver un compte
+$router->put('/admin/users/:id/toggle', [AdminController::class, 'toggleUser'], ['auth']);
+
+// GET    /admin/boutiques            – Liste des boutiques
+$router->get('/admin/boutiques', [AdminController::class, 'boutiques'], ['auth']);
+
+// PUT    /admin/boutiques/:id/toggle – Activer / suspendre une boutique
+$router->put('/admin/boutiques/:id/toggle', [AdminController::class, 'toggleBoutique'], ['auth']);
+
+// GET    /admin/avis                 – Liste des avis (modération)
+$router->get('/admin/avis', [AdminController::class, 'avis'], ['auth']);
+
+// DELETE /admin/avis/:id             – Supprimer un avis
+$router->delete('/admin/avis/:id', [AdminController::class, 'deleteAvis'], ['auth']);
 
 // =========================================================================
 // ROUTE DE SANTÉ

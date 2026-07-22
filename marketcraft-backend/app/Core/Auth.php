@@ -64,7 +64,7 @@ class Auth
     }
 
     // ------------------------------------------------------------------
-    // Génération du refresh token (durée plus longue : 30 jours)
+    // Génération du refresh token (durée plus longue : 7 jours)
     // ------------------------------------------------------------------
 
     public static function generateRefreshToken(array $user): string
@@ -75,7 +75,7 @@ class Auth
             'iss'  => $_ENV['APP_URL'] ?? getenv('APP_URL') ?: 'marketcraft',
             'iat'  => $now,
             'nbf'  => $now,
-            'exp'  => $now + 86400 * 30,
+            'exp'  => $now + 86400 * 7,
             'sub'  => (string) $user['id'],
             'email'=> $user['email'],
             'role' => $user['role'],

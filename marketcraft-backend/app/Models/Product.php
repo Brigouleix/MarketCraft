@@ -186,17 +186,47 @@ class Product
         }
 
         if ($categorie !== null && $categorie !== '') {
-            // Le produit matche s'il est rattaché à la catégorie via la table
-            // de liaison (couvre aussi la catégorie principale, migrée dedans)
-            if (is_numeric($categorie)) {
-                $where[] = 'EXISTS (SELECT 1 FROM produit_categorie pcf
-                                     WHERE pcf.produit_id = p.id AND pcf.categorie_id = :cat_id)';
-                $params[':cat_id'] = (int) $categorie;
-            } else {
+            // Filtre multi-catégories : le paramètre peut contenir une ou
+            // plusieurs valeurs séparées par des virgules (ids ou slugs).
+            // Le produit matche s'il est rattaché à AU MOINS UNE des catégories
+            // sélectionnées, via la table de liaison (qui couvre aussi la
+            // catégorie principale, migrée dedans).
+            $valeurs = array_values(array_filter(array_map('trim', explode(',', (string) $categorie))));
+
+            $ids   = [];
+            $slugs = [];
+            foreach ($valeurs as $v) {
+                if (is_numeric($v)) {
+                    $ids[] = (int) $v;
+                } else {
+                    $slugs[] = $v;
+                }
+            }
+
+            $conds = [];
+            if (!empty($ids)) {
+                $ph = [];
+                foreach ($ids as $i => $id) {
+                    $key         = ":cat_id_{$i}";
+                    $ph[]        = $key;
+                    $params[$key] = $id;
+                }
+                $conds[] = 'pcf.categorie_id IN (' . implode(', ', $ph) . ')';
+            }
+            if (!empty($slugs)) {
+                $ph = [];
+                foreach ($slugs as $i => $slug) {
+                    $key          = ":cat_slug_{$i}";
+                    $ph[]         = $key;
+                    $params[$key] = $slug;
+                }
+                $conds[] = 'cf.slug IN (' . implode(', ', $ph) . ')';
+            }
+
+            if (!empty($conds)) {
                 $where[] = 'EXISTS (SELECT 1 FROM produit_categorie pcf
                                      JOIN categories cf ON cf.id = pcf.categorie_id
-                                     WHERE pcf.produit_id = p.id AND cf.slug LIKE :cat_slug)';
-                $params[':cat_slug'] = $categorie . '%';
+                                     WHERE pcf.produit_id = p.id AND (' . implode(' OR ', $conds) . '))';
             }
         }
 

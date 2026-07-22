@@ -402,13 +402,18 @@ INSERT INTO `boutiques` (`vendeur_id`, `nom`, `slug`, `description`) VALUES
   (2, 'L\'Atelier de Paul',  'atelier-de-paul',  'Créations en bois fait main, sculptures et objets décoratifs uniques.'),
   (3, 'Sophie Céramiques',   'sophie-ceramiques', 'Poteries et céramiques artisanales inspirées de la nature.');
 
--- Catégories
+-- Catégories (catégories atomiques : un concept par catégorie, sans libellé composé « A & B »)
+-- L'ordre d'insertion fixe les id 1..9, référencés par le seed des produits ci-dessous.
 INSERT INTO `categories` (`nom`, `slug`, `description`, `ordre`) VALUES
-  ('Bois & Menuiserie', 'bois-menuiserie', 'Objets et meubles en bois travaillés à la main',  1),
-  ('Céramique & Poterie', 'ceramique-poterie', 'Pièces uniques façonnées en argile', 2),
-  ('Bijoux & Accessoires', 'bijoux-accessoires', 'Bijoux artisanaux et accessoires faits main', 3),
-  ('Textile & Couture', 'textile-couture', 'Vêtements, sacs et décorations textiles', 4),
-  ('Décoration Maison', 'decoration-maison', 'Objets décoratifs pour embellir votre intérieur', 5);
+  ('Bois',              'bois',              'Objets et meubles en bois travaillés à la main', 1),
+  ('Céramique',         'ceramique',         'Pièces uniques façonnées en argile', 2),
+  ('Bijoux',            'bijoux',            'Bijoux artisanaux faits main', 3),
+  ('Textile',           'textile',           'Vêtements et décorations textiles', 4),
+  ('Décoration Maison', 'decoration-maison', 'Objets décoratifs pour embellir votre intérieur', 5),
+  ('Menuiserie',        'menuiserie',        'Ouvrages et agencements en bois', 6),
+  ('Poterie',           'poterie',           'Poteries et terres cuites', 7),
+  ('Accessoires',       'accessoires',       'Accessoires et petite maroquinerie', 8),
+  ('Couture',           'couture',           'Créations cousues, sacs et linge', 9);
 
 -- Produits
 INSERT INTO `produits` (`boutique_id`, `categorie_id`, `nom`, `slug`, `description`, `prix`, `stock`, `images`) VALUES

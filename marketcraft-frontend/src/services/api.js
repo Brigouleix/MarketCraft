@@ -91,6 +91,7 @@ export const authAPI = {
   register:     (userData)    => api.post('/auth/register', userData),
   me:           ()            => api.get('/auth/me'),
   updateMe:     (data)        => api.put('/auth/me', data),
+  deleteMe:     (data)        => api.delete('/auth/me', { data }),
   logout:       ()            => api.post('/auth/logout'),
   refreshToken: (token)       => api.post('/auth/refresh', { refresh_token: token }),
 };
@@ -153,6 +154,17 @@ export const uploadAPI = {
     files.forEach((f) => form.append('images[]', f));
     return api.post('/upload/images', form, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+};
+
+// ── Administration ───────────────────────────────────────────────────────────
+export const adminAPI = {
+  getStats:        () => api.get('/admin/stats'),
+  getUsers:        () => api.get('/admin/users'),
+  toggleUser:      (id) => api.put(`/admin/users/${id}/toggle`),
+  getBoutiques:    () => api.get('/admin/boutiques'),
+  toggleBoutique:  (id) => api.put(`/admin/boutiques/${id}/toggle`),
+  getAvis:         () => api.get('/admin/avis'),
+  deleteAvis:      (id) => api.delete(`/admin/avis/${id}`),
 };
 
 export default api;
