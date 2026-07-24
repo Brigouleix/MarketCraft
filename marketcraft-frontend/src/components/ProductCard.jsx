@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Store } from 'lucide-react';
+import { ShoppingCart, Store, Star } from 'lucide-react';
 import { CartContext } from '../contexts/CartContext';
 import StarRating from './StarRating';
 import { parseImages } from '../utils/parseImages';
@@ -8,7 +8,13 @@ import { parseImages } from '../utils/parseImages';
 const PLACEHOLDER_IMG =
   'https://images.unsplash.com/photo-1493106641515-6b5631de4bb9?w=400&q=80';
 
-export default function ProductCard({ product }) {
+/**
+ * @param {boolean} compact  Variante resserrée : une seule étoile suivie de la
+ *   note, et pas de bouton d'ajout au panier — toute la carte devient alors un
+ *   raccourci vers la fiche produit. Utilisée là où la place manque, comme le
+ *   modal de recherche IA qui affiche quatre colonnes.
+ */
+export default function ProductCard({ product, compact = false }) {
   const { addItem } = useContext(CartContext);
 
   const {
@@ -100,27 +106,41 @@ export default function ProductCard({ product }) {
           </h3>
         </Link>
 
-        {/* Stars */}
+        {/* Note : une seule étoile en compact, la rangée complète sinon */}
         <div className="mb-3">
-          <StarRating value={note_moyenne} size={14} showValue count={nb_avis} />
+          {compact ? (
+            <span className="flex items-center gap-1 text-sm text-gray-600">
+              <Star size={14} className="text-amber-400 fill-amber-400" />
+              <span className="font-medium text-gray-800">
+                {Number(note_moyenne).toFixed(1)}
+              </span>
+              {nb_avis > 0 && (
+                <span className="text-xs text-gray-400">({nb_avis})</span>
+              )}
+            </span>
+          ) : (
+            <StarRating value={note_moyenne} size={14} showValue count={nb_avis} />
+          )}
         </div>
 
-        {/* Price + CTA */}
-        <div className="mt-auto flex items-center justify-between">
-          <span className="text-xl font-bold text-primary">
+        {/* Prix, et bouton d'ajout hors mode compact */}
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <span className={`font-bold text-primary ${compact ? 'text-lg' : 'text-xl'}`}>
             {Number(prix).toFixed(2)} €
           </span>
-          <button
-            onClick={handleAddToCart}
-            disabled={!inStock}
-            className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-2 rounded-lg
-                       hover:bg-primary-600 active:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed
-                       transition-colors duration-200"
-            title={inStock ? 'Ajouter au panier' : 'Rupture de stock'}
-          >
-            <ShoppingCart size={15} />
-            <span className="hidden sm:inline">Ajouter</span>
-          </button>
+          {!compact && (
+            <button
+              onClick={handleAddToCart}
+              disabled={!inStock}
+              className="flex items-center gap-1.5 bg-primary text-white text-sm font-medium px-3 py-2 rounded-lg
+                         hover:bg-primary-600 active:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed
+                         transition-colors duration-200"
+              title={inStock ? 'Ajouter au panier' : 'Rupture de stock'}
+            >
+              <ShoppingCart size={15} />
+              <span className="hidden sm:inline">Ajouter</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

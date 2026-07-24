@@ -309,8 +309,8 @@ export default function AISearchBar({ isOpen, onClose }) {
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {results.products.slice(0, 8).map((product) => (
-                      <div key={product.id} onClick={handleClose}>
-                        <ProductCard product={product} />
+                      <div key={product.id} onClick={handleClose} className="cursor-pointer">
+                        <ProductCard product={product} compact />
                       </div>
                     ))}
                   </div>
