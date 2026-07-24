@@ -44,12 +44,13 @@ class Product
         ?float          $prixMax    = null,
         string          $sort       = 'created_at',
         string          $order      = 'DESC',
-        ?float          $noteMin    = null
+        ?float          $noteMin    = null,
+        int|string|null $materiau   = null
     ): array {
         $offset = ($page - 1) * $limit;
 
         [$whereClause, $having, $params] = $this->buildFilters(
-            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin
+            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin, $materiau
         );
 
         // Whitelist des colonnes de tri (colonnes brutes ou agrégats calculés)
@@ -140,10 +141,11 @@ class Product
         ?int            $boutiqueId = null,
         ?float          $prixMin    = null,
         ?float          $prixMax    = null,
-        ?float          $noteMin    = null
+        ?float          $noteMin    = null,
+        int|string|null $materiau   = null
     ): int {
         [$whereClause, $having, $params] = $this->buildFilters(
-            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin
+            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin, $materiau
         );
 
         $sql = "SELECT COUNT(*) FROM (
@@ -174,7 +176,8 @@ class Product
         ?int            $boutiqueId,
         ?float          $prixMin,
         ?float          $prixMax,
-        ?float          $noteMin
+        ?float          $noteMin,
+        int|string|null $materiau = null
     ): array {
         $where  = ['p.est_actif = 1'];
         $params = [];
@@ -185,49 +188,18 @@ class Product
             $params[':search2'] = '%' . $search . '%';
         }
 
-        if ($categorie !== null && $categorie !== '') {
-            // Filtre multi-catégories : le paramètre peut contenir une ou
-            // plusieurs valeurs séparées par des virgules (ids ou slugs).
-            // Le produit matche s'il est rattaché à AU MOINS UNE des catégories
-            // sélectionnées, via la table de liaison (qui couvre aussi la
-            // catégorie principale, migrée dedans).
-            $valeurs = array_values(array_filter(array_map('trim', explode(',', (string) $categorie))));
+        // Les deux groupes de filtres (objet et matériau) partagent la même
+        // mécanique : au sein d'un groupe les valeurs sont en OU, mais les deux
+        // groupes se croisent en ET. Sélectionner « Céramique » et « Argile »
+        // renvoie donc les céramiques EN argile, pas leur union.
+        $clauseCategorie = $this->buildCategorieExists($categorie, 'cat', $params);
+        if ($clauseCategorie !== null) {
+            $where[] = $clauseCategorie;
+        }
 
-            $ids   = [];
-            $slugs = [];
-            foreach ($valeurs as $v) {
-                if (is_numeric($v)) {
-                    $ids[] = (int) $v;
-                } else {
-                    $slugs[] = $v;
-                }
-            }
-
-            $conds = [];
-            if (!empty($ids)) {
-                $ph = [];
-                foreach ($ids as $i => $id) {
-                    $key         = ":cat_id_{$i}";
-                    $ph[]        = $key;
-                    $params[$key] = $id;
-                }
-                $conds[] = 'pcf.categorie_id IN (' . implode(', ', $ph) . ')';
-            }
-            if (!empty($slugs)) {
-                $ph = [];
-                foreach ($slugs as $i => $slug) {
-                    $key          = ":cat_slug_{$i}";
-                    $ph[]         = $key;
-                    $params[$key] = $slug;
-                }
-                $conds[] = 'cf.slug IN (' . implode(', ', $ph) . ')';
-            }
-
-            if (!empty($conds)) {
-                $where[] = 'EXISTS (SELECT 1 FROM produit_categorie pcf
-                                     JOIN categories cf ON cf.id = pcf.categorie_id
-                                     WHERE pcf.produit_id = p.id AND (' . implode(' OR ', $conds) . '))';
-            }
+        $clauseMateriau = $this->buildCategorieExists($materiau, 'mat', $params);
+        if ($clauseMateriau !== null) {
+            $where[] = $clauseMateriau;
         }
 
         if ($boutiqueId !== null) {
@@ -462,6 +434,68 @@ class Product
     // ------------------------------------------------------------------
     // Slug
     // ------------------------------------------------------------------
+
+    /**
+     * Construit une sous-requête EXISTS pour un groupe de catégories.
+     *
+     * Le paramètre peut contenir une ou plusieurs valeurs séparées par des
+     * virgules (ids numériques ou slugs). Le produit matche s'il est rattaché
+     * à AU MOINS UNE d'entre elles, via la table de liaison produit_categorie
+     * (qui couvre aussi la catégorie principale, migrée dedans).
+     *
+     * @param  string $prefixe Préfixe des marqueurs nommés, pour éviter toute
+     *                         collision entre les différents groupes de filtres.
+     * @param  array  $params  Tableau de paramètres liés, complété par référence.
+     * @return string|null     La clause EXISTS, ou null si aucun filtre.
+     */
+    private function buildCategorieExists(int|string|null $valeur, string $prefixe, array &$params): ?string
+    {
+        if ($valeur === null || $valeur === '') {
+            return null;
+        }
+
+        $valeurs = array_values(array_filter(array_map('trim', explode(',', (string) $valeur))));
+
+        $ids   = [];
+        $slugs = [];
+        foreach ($valeurs as $v) {
+            if (is_numeric($v)) {
+                $ids[] = (int) $v;
+            } else {
+                $slugs[] = $v;
+            }
+        }
+
+        $conds = [];
+
+        if (!empty($ids)) {
+            $ph = [];
+            foreach ($ids as $i => $id) {
+                $key          = ":{$prefixe}_id_{$i}";
+                $ph[]         = $key;
+                $params[$key] = $id;
+            }
+            $conds[] = "pcf_{$prefixe}.categorie_id IN (" . implode(', ', $ph) . ')';
+        }
+
+        if (!empty($slugs)) {
+            $ph = [];
+            foreach ($slugs as $i => $slug) {
+                $key          = ":{$prefixe}_slug_{$i}";
+                $ph[]         = $key;
+                $params[$key] = $slug;
+            }
+            $conds[] = "cf_{$prefixe}.slug IN (" . implode(', ', $ph) . ')';
+        }
+
+        if (empty($conds)) {
+            return null;
+        }
+
+        return "EXISTS (SELECT 1 FROM produit_categorie pcf_{$prefixe}
+                         JOIN categories cf_{$prefixe} ON cf_{$prefixe}.id = pcf_{$prefixe}.categorie_id
+                         WHERE pcf_{$prefixe}.produit_id = p.id AND (" . implode(' OR ', $conds) . '))';
+    }
 
     private function generateSlug(string $nom, ?int $excludeId = null): string
     {

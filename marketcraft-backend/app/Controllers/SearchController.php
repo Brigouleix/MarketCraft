@@ -22,8 +22,9 @@ class SearchController extends Controller
     // URL de l'API Anthropic
     private const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
-    // Modèle Claude à utiliser
-    private const CLAUDE_MODEL = 'claude-opus-4-7';
+    // Modèle Claude à utiliser. Haiku suffit pour de l'extraction de mots-clés
+    // et coûte nettement moins cher qu'Opus ou Sonnet.
+    private const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 
     // Nombre maximum de tokens pour la réponse Claude
     private const MAX_TOKENS = 512;
@@ -77,6 +78,9 @@ class SearchController extends Controller
         $this->json([
             'success' => true,
             'data'    => [
+                // Permet au client de distinguer une vraie interprétation IA
+                // d'un simple repli sur les mots-clés.
+                'ia_active'  => $aiResult !== null,
                 'ai_message' => $aiMessage,
                 'keywords'   => $keywords,
                 'products'   => $products,
@@ -128,10 +132,17 @@ class SearchController extends Controller
     private function callClaudeApi(string $userQuery): ?array
     {
         // Récupération de la clé API depuis les variables d'environnement
-        $apiKey = $_ENV['ANTHROPIC_API_KEY'] ?? getenv('ANTHROPIC_API_KEY') ?: '';
+        $apiKey = trim((string) ($_ENV['ANTHROPIC_API_KEY'] ?? getenv('ANTHROPIC_API_KEY') ?: ''));
 
-        if ($apiKey === '') {
-            // Pas de clé configurée : on passe directement au fallback
+        // La valeur d'exemple livrée dans .env.example passe le test « non vide »
+        // mais provoque un 401 côté Anthropic. On la traite comme une absence
+        // de clé, en le signalant explicitement dans les logs.
+        if ($apiKey === '' || !str_starts_with($apiKey, 'sk-ant-')) {
+            error_log(
+                $apiKey === ''
+                    ? '[SearchController] ANTHROPIC_API_KEY absente : recherche IA désactivée, repli sur les mots-clés.'
+                    : '[SearchController] ANTHROPIC_API_KEY invalide (doit commencer par « sk-ant- ») : repli sur les mots-clés.'
+            );
             return null;
         }
 
@@ -191,11 +202,15 @@ SYSTEM;
 
         // Vérification des erreurs réseau
         if ($response === false || $curlError !== '') {
+            error_log('[SearchController] Appel Anthropic échoué (réseau) : ' . $curlError);
             return null;
         }
 
         // Vérification du code HTTP
         if ($httpCode < 200 || $httpCode >= 300) {
+            // Le corps de la réponse contient le motif exact du refus
+            // (clé invalide, modèle inconnu, quota dépassé…).
+            error_log("[SearchController] Anthropic a répondu {$httpCode} : " . substr((string) $response, 0, 500));
             return null;
         }
 
@@ -203,6 +218,7 @@ SYSTEM;
         $apiResponse = json_decode((string) $response, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log('[SearchController] Réponse Anthropic illisible : ' . json_last_error_msg());
             return null;
         }
 

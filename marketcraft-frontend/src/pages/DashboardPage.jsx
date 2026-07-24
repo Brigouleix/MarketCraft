@@ -194,6 +194,19 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
   const queryClient = useQueryClient();
   const { data: categories = [] } = useCategories();
 
+  // Les catégories sont hiérarchisées (« Objet », « Matériau »). On n'affiche
+  // que les feuilles : les racines servent d'intitulés de section et ne sont
+  // pas sélectionnables, un produit ne se range pas dans « Objet » tout court.
+  const racines = categories.filter((c) => !c.parent_id);
+  const groupes = racines
+    .map((r) => ({ racine: r, enfants: categories.filter((c) => c.parent_id === r.id) }))
+    .filter((g) => g.enfants.length > 0);
+
+  // Repli : hiérarchie absente en base, on liste tout à plat comme avant.
+  const groupesAffiches = groupes.length > 0
+    ? groupes
+    : [{ racine: null, enfants: categories }];
+
   const up = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const toggleCategorie = (id) =>
@@ -265,19 +278,28 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
               Catégories <span className="text-gray-400 font-normal">(plusieurs choix possibles)</span>
             </label>
             <div className="space-y-1 p-3 border border-secondary-300 rounded-lg bg-secondary-50 max-h-40 overflow-y-auto">
-              {categories.map((cat) => (
-                <label
-                  key={cat.id}
-                  className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-secondary-100"
-                >
-                  <input
-                    type="checkbox"
-                    checked={form.categorie_ids.includes(cat.id)}
-                    onChange={() => toggleCategorie(cat.id)}
-                    className="rounded text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
-                </label>
+              {groupesAffiches.map(({ racine, enfants }) => (
+                <div key={racine?.id ?? 'toutes'} className="mb-2 last:mb-0">
+                  {racine && (
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 px-1 mb-1">
+                      {racine.nom}
+                    </p>
+                  )}
+                  {enfants.map((cat) => (
+                    <label
+                      key={cat.id}
+                      className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-secondary-100"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.categorie_ids.includes(cat.id)}
+                        onChange={() => toggleCategorie(cat.id)}
+                        className="rounded text-primary focus:ring-primary"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
+                    </label>
+                  ))}
+                </div>
               ))}
             </div>
             {form.categorie_ids.length > 1 && (

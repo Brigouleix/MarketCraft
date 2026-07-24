@@ -38,10 +38,13 @@ function ProductSkeleton() {
 export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Onglet actif du panneau de filtres : « objet » ou « materiau »
+  const [filterTab, setFilterTab] = useState('objet');
 
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
     categorie: searchParams.get('categorie') || '',
+    materiau: searchParams.get('materiau') || '',
     prix_min: searchParams.get('prix_min') || '',
     prix_max: searchParams.get('prix_max') || '',
     note_min: Number(searchParams.get('note_min')) || 0,
@@ -58,6 +61,7 @@ export default function ProductsPage() {
     setFilters({
       search: searchParams.get('search') || '',
       categorie: searchParams.get('categorie') || '',
+      materiau: searchParams.get('materiau') || '',
       prix_min: searchParams.get('prix_min') || '',
       prix_max: searchParams.get('prix_max') || '',
       note_min: Number(searchParams.get('note_min')) || 0,
@@ -78,6 +82,21 @@ export default function ProductsPage() {
   const categories = categoriesData?.length
     ? categoriesData
     : CATEGORIES.map((slug) => ({ id: slug, nom: slug, slug }));
+
+  // Les catégories sont hiérarchisées sous deux racines : « Objet » et
+  // « Matériau ». On les répartit en deux groupes de filtres indépendants.
+  // Repli : si la hiérarchie n'est pas encore en base (parent_id vide), tout
+  // reste affiché dans l'onglet Objet, comme avant.
+  const racineObjet = categories.find((c) => c.slug === 'objet');
+  const racineMateriau = categories.find((c) => c.slug === 'materiau');
+
+  const categoriesObjet = racineObjet
+    ? categories.filter((c) => c.parent_id === racineObjet.id)
+    : categories.filter((c) => !c.parent_id && c.slug !== 'materiau');
+
+  const categoriesMateriau = racineMateriau
+    ? categories.filter((c) => c.parent_id === racineMateriau.id)
+    : [];
 
   // Use mock data when API is unavailable
   const mockProducts = Array.from({ length: 12 }, (_, i) => ({
@@ -115,13 +134,19 @@ export default function ProductsPage() {
   // Catégories sélectionnées : le paramètre "categorie" est une liste de slugs
   // séparés par des virgules (multi-sélection).
   const selectedCategories = filters.categorie ? filters.categorie.split(',').filter(Boolean) : [];
+  const selectedMateriaux = filters.materiau ? filters.materiau.split(',').filter(Boolean) : [];
 
-  const toggleCategorie = (slug) => {
-    const next = selectedCategories.includes(slug)
-      ? selectedCategories.filter((s) => s !== slug)
-      : [...selectedCategories, slug];
-    updateFilter('categorie', next.join(','));
+  // Les deux groupes se croisent en ET côté API : cocher « Céramique » et
+  // « Argile » renvoie les céramiques en argile, pas leur union.
+  const toggleDans = (key, selection) => (slug) => {
+    const next = selection.includes(slug)
+      ? selection.filter((s) => s !== slug)
+      : [...selection, slug];
+    updateFilter(key, next.join(','));
   };
+
+  const toggleCategorie = toggleDans('categorie', selectedCategories);
+  const toggleMateriau = toggleDans('materiau', selectedMateriaux);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -133,7 +158,8 @@ export default function ProductsPage() {
     setLocalSearch('');
   };
 
-  const hasActiveFilters = filters.search || filters.categorie || filters.prix_min || filters.prix_max || filters.note_min > 0;
+  const hasActiveFilters = filters.search || filters.categorie || filters.materiau
+    || filters.prix_min || filters.prix_max || filters.note_min > 0;
 
   // Applique les prix saisis localement aux filtres URL
   const applyPrix = () =>
@@ -153,33 +179,78 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Category (multi-sélection : une case par ligne) */}
+      {/* Catégories, réparties en deux onglets : Objet et Matériau.
+          Multi-sélection dans chaque onglet ; les deux se croisent en ET. */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-gray-700">Catégories</h3>
-          {selectedCategories.length > 0 && (
+        <div className="flex gap-1 border-b border-secondary-200 mb-3">
+          {[
+            { key: 'objet',    label: 'Objet',     count: selectedCategories.length },
+            { key: 'materiau', label: 'Matériaux', count: selectedMateriaux.length  },
+          ].map(({ key, label, count }) => (
             <button
-              onClick={() => updateFilter('categorie', '')}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              key={key}
+              type="button"
+              onClick={() => setFilterTab(key)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                filterTab === key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
             >
-              Tout décocher
+              {label}
+              {count > 0 && (
+                <span className="text-[10px] bg-primary text-white rounded-full px-1.5 py-0.5 leading-none">
+                  {count}
+                </span>
+              )}
             </button>
-          )}
-        </div>
-        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-          {categories.map((cat) => (
-            <label key={cat.slug} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                value={cat.slug}
-                checked={selectedCategories.includes(cat.slug)}
-                onChange={() => toggleCategorie(cat.slug)}
-                className="rounded text-primary focus:ring-primary"
-              />
-              <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
-            </label>
           ))}
         </div>
+
+        {(() => {
+          const estObjet = filterTab === 'objet';
+          const liste = estObjet ? categoriesObjet : categoriesMateriau;
+          const selection = estObjet ? selectedCategories : selectedMateriaux;
+          const toggle = estObjet ? toggleCategorie : toggleMateriau;
+          const cle = estObjet ? 'categorie' : 'materiau';
+
+          if (liste.length === 0) {
+            return (
+              <p className="text-xs text-gray-400 py-3">
+                Aucune catégorie dans ce groupe pour le moment.
+              </p>
+            );
+          }
+
+          return (
+            <>
+              {selection.length > 0 && (
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={() => updateFilter(cle, '')}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    Tout décocher
+                  </button>
+                </div>
+              )}
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                {liste.map((cat) => (
+                  <label key={cat.slug} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      value={cat.slug}
+                      checked={selection.includes(cat.slug)}
+                      onChange={() => toggle(cat.slug)}
+                      className="rounded text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Price range */}
@@ -300,6 +371,15 @@ export default function ProductsPage() {
               <span key={slug} className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full capitalize">
                 {cat?.nom || slug}
                 <button onClick={() => toggleCategorie(slug)}><X size={11} /></button>
+              </span>
+            );
+          })}
+          {selectedMateriaux.map((slug) => {
+            const cat = categories.find((c) => c.slug === slug);
+            return (
+              <span key={`mat-${slug}`} className="flex items-center gap-1 text-xs bg-secondary-200 text-gray-700 px-3 py-1 rounded-full capitalize">
+                {cat?.nom || slug}
+                <button onClick={() => toggleMateriau(slug)}><X size={11} /></button>
               </span>
             );
           })}

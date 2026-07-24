@@ -243,6 +243,25 @@ class AdminController extends Controller
         // Les triggers de la base recalculent automatiquement la note du produit.
         $this->success(null, 'Avis deleted.');
     }
+    /**
+     * Lit et valide `parent_id` dans le corps de la requête.
+     *
+     * @return int|null|false L'identifiant, null pour une racine,
+     *                        false si la catégorie parente n'existe pas.
+     */
+    private function normalizeParentId(array $body): int|null|false
+    {
+        $raw = $body['parent_id'] ?? null;
+
+        if ($raw === null || $raw === '' || $raw === 0 || $raw === '0') {
+            return null;
+        }
+
+        $parentId = (int) $raw;
+
+        return $this->categorieModel->findById($parentId) === null ? false : $parentId;
+    }
+
     // ------------------------------------------------------------------
     // GET /admin/categories  – liste enrichie du nombre de produits
     // ------------------------------------------------------------------
@@ -253,7 +272,10 @@ class AdminController extends Controller
             return;
         }
 
-        $this->success($this->categorieModel->findAllWithCounts());
+        $this->success([
+            'categories' => $this->categorieModel->findAllWithCounts(),
+            'racines'    => $this->categorieModel->findRoots(),
+        ]);
     }
 
     // ------------------------------------------------------------------
@@ -285,7 +307,15 @@ class AdminController extends Controller
             return;
         }
 
+        $parentId = $this->normalizeParentId($body);
+
+        if ($parentId === false) {
+            $this->error('Catégorie parente introuvable.', 422);
+            return;
+        }
+
         $id = $this->categorieModel->create([
+            'parent_id'   => $parentId,
             'nom'         => $nom,
             'description' => isset($body['description']) ? trim((string) $body['description']) : null,
             'image_url'   => $body['image_url'] ?? null,
@@ -346,6 +376,23 @@ class AdminController extends Controller
             if (array_key_exists($col, $body)) {
                 $data[$col] = $body[$col];
             }
+        }
+
+        if (array_key_exists('parent_id', $body)) {
+            $parentId = $this->normalizeParentId($body);
+
+            if ($parentId === false) {
+                $this->error('Catégorie parente introuvable.', 422);
+                return;
+            }
+
+            // Une catégorie ne peut pas être son propre parent.
+            if ($parentId === $id) {
+                $this->error('Une catégorie ne peut pas être sa propre parente.', 422);
+                return;
+            }
+
+            $data['parent_id'] = $parentId;
         }
 
         if ($data === []) {

@@ -236,13 +236,19 @@ function CategoriesTab() {
   const queryClient = useQueryClient();
   const [nom, setNom] = useState('');
   const [description, setDescription] = useState('');
+  const [parentId, setParentId] = useState('');
   const [editId, setEditId] = useState(null);
   const [editNom, setEditNom] = useState('');
 
-  const { data: categories = [], isLoading } = useQuery({
+  // L'API renvoie { categories, racines } : les racines alimentent le
+  // sélecteur de rattachement (« Objet », « Matériau »…).
+  const { data, isLoading } = useQuery({
     queryKey: ['admin-categories'],
     queryFn: async () => (await adminAPI.getCategories()).data.data,
   });
+
+  const categories = data?.categories ?? [];
+  const racines = data?.racines ?? [];
 
   const refresh = () => {
     queryClient.invalidateQueries(['admin-categories']);
@@ -251,7 +257,11 @@ function CategoriesTab() {
   };
 
   const { mutate: create, isPending: creating } = useMutation({
-    mutationFn: () => adminAPI.createCategorie({ nom: nom.trim(), description: description.trim() || null }),
+    mutationFn: () => adminAPI.createCategorie({
+      nom: nom.trim(),
+      description: description.trim() || null,
+      parent_id: parentId || null,
+    }),
     onSuccess: () => {
       setNom('');
       setDescription('');
@@ -330,6 +340,16 @@ function CategoriesTab() {
             maxLength={1000}
             className="input-field flex-1"
           />
+          <select
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+            className="input-field sm:w-44"
+          >
+            <option value="">Racine</option>
+            {racines.map((r) => (
+              <option key={r.id} value={r.id}>{r.nom}</option>
+            ))}
+          </select>
           <button type="submit" disabled={creating} className="btn-primary flex items-center gap-1.5 justify-center">
             <Plus size={16} /> {creating ? 'Ajout…' : 'Ajouter'}
           </button>
@@ -347,6 +367,7 @@ function CategoriesTab() {
             <thead className="bg-secondary-50 text-gray-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Nom</th>
+                <th className="px-4 py-3 font-medium">Groupe</th>
                 <th className="px-4 py-3 font-medium">Slug</th>
                 <th className="px-4 py-3 font-medium">Produits</th>
                 <th className="px-4 py-3 font-medium text-right">Actions</th>
@@ -370,6 +391,15 @@ function CategoriesTab() {
                       />
                     ) : (
                       <span className="font-medium text-gray-800">{c.nom}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {c.parent_nom ? (
+                      <span className="text-xs bg-secondary-100 text-gray-600 px-2 py-0.5 rounded-full">
+                        {c.parent_nom}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">racine</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{c.slug}</td>

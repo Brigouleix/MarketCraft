@@ -30,6 +30,7 @@ class ProductController extends Controller
         $limit     = min(100, max(1, (int) ($this->getParam('per_page') ?? $this->getParam('limit', 20))));
         $search    = $this->getParam('search')    ?: null;
         $categorie = $this->getParam('categorie') ?: null; // id numérique ou slug
+        $materiau  = $this->getParam('materiau')  ?: null; // idem, groupe « Matériau »
         $boutiqueP = $this->getParam('boutique_id') ?? $this->getParam('boutique');
         $boutique  = $boutiqueP ? (int) $boutiqueP : null;
         $prixMin   = $this->getParam('prix_min')  ? (float) $this->getParam('prix_min') : null;
@@ -53,10 +54,10 @@ class ProductController extends Controller
         }
 
         $items = $this->productModel->findAll(
-            $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order, $noteMin
+            $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order, $noteMin, $materiau
         );
 
-        $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax, $noteMin);
+        $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax, $noteMin, $materiau);
 
         $this->paginated($items, $total, $page, $limit);
     }

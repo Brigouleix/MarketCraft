@@ -4,7 +4,7 @@ import { productsAPI } from '../services/api';
 /**
  * Fetches a paginated, filtered list of products.
  *
- * @param {Object} filters  - { search, categorie, prix_min, prix_max, note_min, tri, page, per_page }
+ * @param {Object} filters  - { search, categorie, materiau, prix_min, prix_max, note_min, tri, page, per_page }
  * @param {Object} options  - additional react-query options
  */
 export function useProducts(filters = {}, options = {}) {
@@ -13,6 +13,7 @@ export function useProducts(filters = {}, options = {}) {
     limit: filters.per_page || 12,
     ...(filters.search && { search: filters.search }),
     ...(filters.categorie && { categorie: filters.categorie }),
+    ...(filters.materiau && { materiau: filters.materiau }),
     ...(filters.prix_min !== undefined && filters.prix_min !== '' && { prix_min: filters.prix_min }),
     ...(filters.prix_max !== undefined && filters.prix_max !== '' && { prix_max: filters.prix_max }),
     ...(filters.note_min !== undefined && filters.note_min > 0 && { note_min: filters.note_min }),

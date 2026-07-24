@@ -10,9 +10,9 @@ use PDO;
 /**
  * Categorie — acces a la table `categories`.
  *
- * Les categories sont gerees a plat : la colonne `parent_id` existe dans le
- * schema (contrainte auto-referente) mais n'est pas exploitee par l'interface
- * d'administration, qui ne cree que des categories de premier niveau.
+ * Les categories sont hierarchisees sur deux niveaux via `parent_id` :
+ * deux racines (« Objet » et « Materiau ») regroupent chacune leurs
+ * sous-categories. L'administration permet de choisir le rattachement.
  */
 class Categorie
 {
@@ -47,6 +47,7 @@ class Categorie
         $stmt = $this->db->query(
             'SELECT c.id, c.parent_id, c.nom, c.slug, c.description,
                     c.image_url, c.ordre, c.created_at,
+                    pa.nom AS parent_nom,
                     (
                         SELECT COUNT(DISTINCT p.id)
                         FROM produits p
@@ -54,7 +55,8 @@ class Categorie
                         WHERE p.categorie_id = c.id OR pc.categorie_id = c.id
                     ) AS nb_produits
              FROM categories c
-             ORDER BY c.ordre ASC, c.nom ASC'
+             LEFT JOIN categories pa ON pa.id = c.parent_id
+             ORDER BY COALESCE(pa.ordre, c.ordre) ASC, c.parent_id IS NOT NULL, c.ordre ASC, c.nom ASC'
         );
 
         return array_map(
@@ -64,6 +66,22 @@ class Categorie
             },
             $stmt->fetchAll()
         );
+    }
+
+    /**
+     * Categories racines (parent_id IS NULL) : « Objet », « Materiau »…
+     * Sert a alimenter le selecteur de rattachement cote administration.
+     */
+    public function findRoots(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT id, nom, slug
+             FROM categories
+             WHERE parent_id IS NULL
+             ORDER BY ordre ASC, nom ASC'
+        );
+
+        return $stmt->fetchAll();
     }
 
     public function findById(int $id): ?array
@@ -110,11 +128,13 @@ class Categorie
     public function create(array $data): int
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO categories (nom, slug, description, image_url, ordre)
-             VALUES (:nom, :slug, :description, :image_url, :ordre)'
+            'INSERT INTO categories (parent_id, nom, slug, description, image_url, ordre)
+             VALUES (:parent_id, :nom, :slug, :description, :image_url, :ordre)'
         );
 
         $stmt->execute([
+            ':parent_id'   => isset($data['parent_id']) && $data['parent_id'] !== ''
+                ? (int) $data['parent_id'] : null,
             ':nom'         => $data['nom'],
             ':slug'        => $this->generateSlug($data['nom']),
             ':description' => $data['description'] ?? null,
@@ -152,6 +172,12 @@ class Categorie
         if (array_key_exists('ordre', $data)) {
             $fields[] = 'ordre = :ordre';
             $params[':ordre'] = (int) $data['ordre'];
+        }
+
+        if (array_key_exists('parent_id', $data)) {
+            $fields[] = 'parent_id = :parent_id';
+            $params[':parent_id'] = ($data['parent_id'] === null || $data['parent_id'] === '')
+                ? null : (int) $data['parent_id'];
         }
 
         if ($fields === []) {
