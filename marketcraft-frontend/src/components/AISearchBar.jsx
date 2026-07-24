@@ -242,14 +242,41 @@ export default function AISearchBar({ isOpen, onClose }) {
           {results && !isLoading && (
             <div className="space-y-5">
 
-              {/* Message IA (bulle de chat) */}
+              {/* Message IA (bulle de chat).
+                  La teinte et le badge distinguent une interprétation réelle
+                  du modèle d'un repli sur l'extraction de mots-clés locale :
+                  sans cela, les deux réponses sont indiscernables. */}
               {results.ai_message && (
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-sm">🤖</span>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    results.ia_active ? 'bg-green-100' : 'bg-amber-100'
+                  }`}>
+                    <span className="text-sm">{results.ia_active ? '🤖' : '🔍'}</span>
                   </div>
-                  <div className="bg-green-50 border border-green-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-green-800 flex-1">
+                  <div className={`rounded-2xl rounded-tl-sm px-4 py-3 text-sm flex-1 border ${
+                    results.ia_active
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                        results.ia_active ? 'bg-green-200 text-green-900' : 'bg-amber-200 text-amber-900'
+                      }`}>
+                        {results.ia_active ? 'IA active' : 'Mode dégradé'}
+                      </span>
+                      {!results.ia_active && (
+                        <span className="text-[11px] text-amber-700">
+                          recherche par mots-clés
+                        </span>
+                      )}
+                    </div>
                     {results.ai_message}
+                    {/* Motif d'indisponibilité, expose par l'API hors production */}
+                    {!results.ia_active && results.ia_erreur && (
+                      <p className="mt-2 text-[11px] text-amber-700 font-mono break-words">
+                        {results.ia_erreur}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
