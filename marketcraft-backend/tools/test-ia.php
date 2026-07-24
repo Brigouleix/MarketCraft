@@ -32,16 +32,15 @@ foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $ligne
     $env[trim($cle)] = trim($valeur, " \t\n\r\"'");
 }
 
-$apiKey = $env['GROQ_API_KEY'] ?? '';
-$model  = ($env['GROQ_MODEL']   ?? '') ?: 'openai/gpt-oss-120b';
-$apiUrl = ($env['GROQ_API_URL'] ?? '') ?: 'https://api.groq.com/openai/v1/chat/completions';
+$apiKey = ($env['AI_API_KEY'] ?? '') ?: ($env['GROQ_API_KEY'] ?? '');
+$model  = ($env['AI_MODEL']   ?? '') ?: (($env['GROQ_MODEL']   ?? '') ?: 'mistral-small-latest');
+$apiUrl = ($env['AI_API_URL'] ?? '') ?: (($env['GROQ_API_URL'] ?? '') ?: 'https://api.mistral.ai/v1/chat/completions');
 
 if ($apiKey === '') {
-    exit("ECHEC : GROQ_API_KEY absente du .env.\n");
+    exit("ECHEC : AI_API_KEY absente du .env.\n");
 }
 
-printf("  cle    : %d caracteres, debut « %s… », prefixe gsk_ %s\n",
-    strlen($apiKey), substr($apiKey, 0, 8), str_starts_with($apiKey, 'gsk_') ? 'OK' : 'MANQUANT');
+printf("  cle    : %d caracteres, debut « %s… »\n", strlen($apiKey), substr($apiKey, 0, 6));
 printf("  modele : %s\n", $model);
 printf("  url    : %s\n\n", $apiUrl);
 
@@ -143,7 +142,7 @@ if ($httpCode === 200 && isset($data['choices'][0]['message']['content'])) {
     echo "  -> Si l'application echoue malgre tout, le probleme est applicatif\n";
     echo "     (serveur PHP non redemarre, ou .env different de celui-ci).\n";
 } elseif ($httpCode === 401) {
-    echo "  Cle refusee. Regenerez-la sur console.groq.com/keys.\n";
+    echo "  Cle refusee. Regenerez-la sur la console de votre fournisseur.\n";
 } elseif ($httpCode === 429) {
     echo "  Quota du palier gratuit atteint. Reessayez dans une minute.\n";
 } elseif ($httpCode === 403) {

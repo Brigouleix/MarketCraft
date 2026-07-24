@@ -27,22 +27,23 @@ class SearchController extends Controller
     // Nombre maximum de résultats retournés
     private const MAX_RESULTS = 20;
 
-    // Endpoint par défaut : Groq, compatible avec le format OpenAI.
-    private const DEFAULT_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+    // Endpoint par défaut : Mistral, au format OpenAI (chat completions).
+    // Groq offrait le même service mais son pare-feu Cloudflare filtre
+    // certaines plages d'adresses, ce qui le rendait inutilisable ici.
+    private const DEFAULT_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
-    // Modèle par défaut, disponible sur le palier gratuit de Groq.
-    // Attention : Groq retire regulierement des modeles (llama-3.3-70b-versatile
-    // a ete deprecie le 17/06/2026). En cas de 400 « model_decommissioned »,
-    // consulter console.groq.com/docs/deprecations et surcharger GROQ_MODEL
-    // dans le .env — aucune modification de code n'est necessaire.
-    private const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+    // Modèle par défaut. Amplement suffisant pour extraire des mots-clés.
+    // Les fournisseurs retirent régulièrement des modèles : en cas de 400,
+    // surcharger AI_MODEL dans le .env suffit, sans toucher au code.
+    private const DEFAULT_MODEL = 'mistral-small-latest';
 
     // Nombre maximum de tokens pour la réponse du modèle
     private const MAX_TOKENS = 512;
 
-    // Préfixe attendu des clés Groq, pour distinguer une clé réelle d'une
-    // valeur d'exemple laissée dans le .env.
-    private const KEY_PREFIX = 'gsk_';
+    // Fragments trahissant une valeur d'exemple laissée dans le .env.
+    // Un contrôle sur le préfixe serait plus strict, mais chaque fournisseur
+    // a le sien : autant détecter le placeholder plutôt que la forme.
+    private const KEY_PLACEHOLDERS = ['your_', 'votre_', 'xxx', '...', 'api_key_here', 'changeme'];
 
     /**
      * Motif du dernier échec de l'appel IA. Exposé dans la réponse HTTP
@@ -142,8 +143,23 @@ class SearchController extends Controller
         ]);
     }
 
+    /**
+     * Lit une variable d'environnement, avec un nom de repli.
+     */
+    private function env(string $cle, ?string $repli = null): string
+    {
+        foreach (array_filter([$cle, $repli]) as $nom) {
+            $valeur = trim((string) ($_ENV[$nom] ?? getenv($nom) ?: ''));
+            if ($valeur !== '') {
+                return $valeur;
+            }
+        }
+
+        return '';
+    }
+
     // -------------------------------------------------------------------------
-    // Appel au modèle de langage (Groq, format OpenAI)
+    // Appel au modèle de langage (fournisseur au format OpenAI)
     // -------------------------------------------------------------------------
 
     /**
@@ -156,18 +172,24 @@ class SearchController extends Controller
      */
     private function callAiApi(string $userQuery): ?array
     {
-        $apiKey = trim((string) ($_ENV['GROQ_API_KEY'] ?? getenv('GROQ_API_KEY') ?: ''));
-        $apiUrl = trim((string) ($_ENV['GROQ_API_URL'] ?? getenv('GROQ_API_URL') ?: '')) ?: self::DEFAULT_API_URL;
-        $model  = trim((string) ($_ENV['GROQ_MODEL']   ?? getenv('GROQ_MODEL')   ?: '')) ?: self::DEFAULT_MODEL;
+        // Variables génériques AI_*, avec repli sur les anciennes GROQ_*
+        // pour ne pas casser les .env déjà en place.
+        $apiKey = $this->env('AI_API_KEY', 'GROQ_API_KEY');
+        $apiUrl = $this->env('AI_API_URL', 'GROQ_API_URL') ?: self::DEFAULT_API_URL;
+        $model  = $this->env('AI_MODEL',   'GROQ_MODEL')   ?: self::DEFAULT_MODEL;
 
-        // Une valeur d'exemple laissée dans le .env passerait le test « non
-        // vide » et provoquerait un 401 : on vérifie aussi le préfixe.
-        if ($apiKey === '' || !str_starts_with($apiKey, self::KEY_PREFIX)) {
-            $this->iaErreur = $apiKey === ''
-                ? 'GROQ_API_KEY absente du .env (ou serveur PHP non redémarré).'
-                : 'GROQ_API_KEY présente mais ne commence pas par « ' . self::KEY_PREFIX . ' ».';
+        if ($apiKey === '') {
+            $this->iaErreur = 'AI_API_KEY absente du .env (ou serveur PHP non redémarré).';
             error_log('[SearchController] ' . $this->iaErreur);
             return null;
+        }
+
+        foreach (self::KEY_PLACEHOLDERS as $motif) {
+            if (stripos($apiKey, $motif) !== false) {
+                $this->iaErreur = 'AI_API_KEY contient encore une valeur d\'exemple.';
+                error_log('[SearchController] ' . $this->iaErreur);
+                return null;
+            }
         }
 
         // Construction du prompt système
@@ -249,7 +271,7 @@ SYSTEM;
             // 429 = quota du palier gratuit atteint, cas le plus courant.
             $this->iaErreur = match (true) {
                 $httpCode === 429 => 'Quota du palier gratuit atteint (429). Réessayez dans une minute.',
-                $httpCode === 401 => 'Clé API refusée (401). Vérifiez GROQ_API_KEY.',
+                $httpCode === 401 => 'Clé API refusée (401). Vérifiez AI_API_KEY.',
                 $httpCode === 403 => 'Requête bloquée en amont (403). Cloudflare rejette les appels sans User-Agent, ou votre IP est filtrée.',
                 default => "Le fournisseur IA a répondu {$httpCode} pour le modèle « {$model} » : "
                     . substr((string) $response, 0, 300),
