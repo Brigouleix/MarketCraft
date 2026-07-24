@@ -30,9 +30,12 @@ class SearchController extends Controller
     // Endpoint par défaut : Groq, compatible avec le format OpenAI.
     private const DEFAULT_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-    // Modèle par défaut. Largement suffisant pour extraire des mots-clés,
-    // et disponible sur le palier gratuit de Groq.
-    private const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+    // Modèle par défaut, disponible sur le palier gratuit de Groq.
+    // Attention : Groq retire regulierement des modeles (llama-3.3-70b-versatile
+    // a ete deprecie le 17/06/2026). En cas de 400 « model_decommissioned »,
+    // consulter console.groq.com/docs/deprecations et surcharger GROQ_MODEL
+    // dans le .env — aucune modification de code n'est necessaire.
+    private const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 
     // Nombre maximum de tokens pour la réponse du modèle
     private const MAX_TOKENS = 512;
@@ -240,9 +243,12 @@ SYSTEM;
             // Le corps de la réponse contient le motif exact du refus
             // (clé invalide, modèle inconnu, quota dépassé…).
             // 429 = quota du palier gratuit atteint, cas le plus courant.
-            $this->iaErreur = $httpCode === 429
-                ? 'Quota du palier gratuit atteint (429). Réessayez dans une minute.'
-                : "Le fournisseur IA a répondu {$httpCode} : " . substr((string) $response, 0, 300);
+            $this->iaErreur = match (true) {
+                $httpCode === 429 => 'Quota du palier gratuit atteint (429). Réessayez dans une minute.',
+                $httpCode === 401 => 'Clé API refusée (401). Vérifiez GROQ_API_KEY.',
+                default => "Le fournisseur IA a répondu {$httpCode} pour le modèle « {$model} » : "
+                    . substr((string) $response, 0, 300),
+            };
             error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
