@@ -45,7 +45,13 @@ printf("  cle    : %d caracteres, debut « %s… », prefixe gsk_ %s\n",
 printf("  modele : %s\n", $model);
 printf("  url    : %s\n\n", $apiUrl);
 
-echo "=== 2. Appel du fournisseur ===\n";
+$v = curl_version();
+echo "=== 2. Pile HTTP locale ===\n";
+printf("  cURL    : %s\n", $v['version'] ?? '?');
+printf("  TLS     : %s\n", $v['ssl_version'] ?? '?');
+printf("  HTTP/2  : %s\n\n", ($v['features'] ?? 0) & CURL_VERSION_HTTP2 ? 'supporte' : 'non supporte');
+
+echo "=== 3. Appel du fournisseur ===\n";
 
 $corps = json_encode([
     'model'           => $model,
@@ -84,11 +90,50 @@ if ($reponse === false || $curlError !== '') {
     exit(1);
 }
 
-printf("  code HTTP : %d\n\n", $httpCode);
-echo "=== 3. Reponse brute ===\n";
+printf("  tentative 1 (en-tetes minimaux) : HTTP %d\n", $httpCode);
+
+// Si Cloudflare bloque, on retente en ressemblant davantage a un client
+// classique : en-tetes complets et HTTP/2. Cela permet de distinguer un
+// filtrage sur l'empreinte de la requete d'un filtrage sur l'adresse IP.
+if ($httpCode === 403) {
+    $ch2 = curl_init($apiUrl);
+    $opts = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $corps,
+        CURLOPT_TIMEOUT        => 20,
+        CURLOPT_ENCODING       => '',
+        CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MarketCraft/1.0',
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+            'Accept: application/json',
+            'Accept-Language: fr-FR,fr;q=0.9',
+        ],
+    ];
+    if (($v['features'] ?? 0) & CURL_VERSION_HTTP2) {
+        $opts[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_2_0;
+    }
+    curl_setopt_array($ch2, $opts);
+
+    $reponse2  = curl_exec($ch2);
+    $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+    curl_close($ch2);
+
+    printf("  tentative 2 (en-tetes complets + HTTP/2) : HTTP %d\n", $httpCode2);
+
+    if ($httpCode2 !== 403) {
+        $reponse  = $reponse2;
+        $httpCode = $httpCode2;
+        echo "  -> La tentative 2 passe : c'est la forme de la requete qui etait\n";
+        echo "     rejetee, pas votre adresse IP.\n";
+    }
+}
+
+echo "\n=== 4. Reponse brute ===\n";
 echo $reponse . "\n\n";
 
-echo "=== 4. Verdict ===\n";
+echo "=== 5. Verdict ===\n";
 
 $data = json_decode((string) $reponse, true);
 
@@ -102,9 +147,13 @@ if ($httpCode === 200 && isset($data['choices'][0]['message']['content'])) {
 } elseif ($httpCode === 429) {
     echo "  Quota du palier gratuit atteint. Reessayez dans une minute.\n";
 } elseif ($httpCode === 403) {
-    echo "  Bloque en amont par Cloudflare.\n";
-    echo "  Si ce script envoie bien un User-Agent, c'est votre IP qui est\n";
-    echo "  filtree : desactivez tout VPN/proxy, ou essayez un autre reseau.\n";
+    echo "  Bloque par Cloudflare malgre deux formes de requete differentes.\n";
+    echo "  C'est donc votre adresse IP ou votre pile TLS qui est filtree.\n\n";
+    echo "  Test decisif, a lancer dans PowerShell :\n";
+    echo "    curl.exe -s -o NUL -w \"%{http_code}`n\" https://api.groq.com/openai/v1/models -H \"Authorization: Bearer VOTRE_CLE\"\n\n";
+    echo "  - si curl.exe renvoie 200 : le blocage vient du cURL de XAMPP.\n";
+    echo "  - si curl.exe renvoie 403 : c'est le reseau. Coupez VPN/proxy,\n";
+    echo "    ou testez en partage de connexion mobile.\n";
 } elseif ($httpCode === 400) {
     echo "  Requete refusee. Cause la plus frequente : modele retire.\n";
     echo "  Voir console.groq.com/docs/deprecations, puis renseignez\n";
