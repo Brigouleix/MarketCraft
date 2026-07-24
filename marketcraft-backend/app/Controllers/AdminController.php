@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\Auth;
 use App\Config\Database;
+use App\Models\Categorie;
 use PDO;
 
 /**
@@ -23,14 +24,20 @@ use PDO;
  *   PUT    /admin/boutiques/:id/toggle – Activer / suspendre une boutique
  *   GET    /admin/avis               – Liste des avis (modération)
  *   DELETE /admin/avis/:id           – Supprimer un avis
+ *   GET    /admin/categories         – Liste des catégories
+ *   POST   /admin/categories         – Créer une catégorie
+ *   PUT    /admin/categories/:id     – Modifier une catégorie
+ *   DELETE /admin/categories/:id     – Supprimer une catégorie
  */
 class AdminController extends Controller
 {
     private PDO $db;
+    private Categorie $categorieModel;
 
     public function __construct()
     {
         $this->db = Database::getInstance()->getConnection();
+        $this->categorieModel = new Categorie();
     }
 
     /**
@@ -235,5 +242,158 @@ class AdminController extends Controller
 
         // Les triggers de la base recalculent automatiquement la note du produit.
         $this->success(null, 'Avis deleted.');
+    }
+    // ------------------------------------------------------------------
+    // GET /admin/categories  – liste enrichie du nombre de produits
+    // ------------------------------------------------------------------
+
+    public function categories(array $params = []): void
+    {
+        if (!$this->requireAdmin()) {
+            return;
+        }
+
+        $this->success($this->categorieModel->findAllWithCounts());
+    }
+
+    // ------------------------------------------------------------------
+    // POST /admin/categories
+    // ------------------------------------------------------------------
+
+    public function createCategorie(array $params = []): void
+    {
+        if (!$this->requireAdmin()) {
+            return;
+        }
+
+        $body = $this->getBody();
+
+        $errors = $this->validate($body, [
+            'nom'         => 'required|min:2|max:100',
+            'description' => 'max:1000',
+        ]);
+
+        if ($errors !== []) {
+            $this->error('Validation failed.', 422, $errors);
+            return;
+        }
+
+        $nom = trim((string) $body['nom']);
+
+        if ($this->categorieModel->nomExists($nom)) {
+            $this->error('Une catégorie porte déjà ce nom.', 409);
+            return;
+        }
+
+        $id = $this->categorieModel->create([
+            'nom'         => $nom,
+            'description' => isset($body['description']) ? trim((string) $body['description']) : null,
+            'image_url'   => $body['image_url'] ?? null,
+            'ordre'       => $body['ordre'] ?? 0,
+        ]);
+
+        $this->success($this->categorieModel->findById($id), 'Catégorie créée.', 201);
+    }
+
+    // ------------------------------------------------------------------
+    // PUT /admin/categories/:id
+    // ------------------------------------------------------------------
+
+    public function updateCategorie(array $params = []): void
+    {
+        if (!$this->requireAdmin()) {
+            return;
+        }
+
+        $id = (int) ($params['id'] ?? 0);
+
+        if ($this->categorieModel->findById($id) === null) {
+            $this->error('Catégorie introuvable.', 404);
+            return;
+        }
+
+        $body = $this->getBody();
+
+        $errors = $this->validate($body, [
+            'nom'         => 'min:2|max:100',
+            'description' => 'max:1000',
+        ]);
+
+        if ($errors !== []) {
+            $this->error('Validation failed.', 422, $errors);
+            return;
+        }
+
+        $data = [];
+
+        if (array_key_exists('nom', $body)) {
+            $nom = trim((string) $body['nom']);
+
+            if ($nom === '') {
+                $this->error('Le nom ne peut pas être vide.', 422);
+                return;
+            }
+
+            if ($this->categorieModel->nomExists($nom, $id)) {
+                $this->error('Une autre catégorie porte déjà ce nom.', 409);
+                return;
+            }
+
+            $data['nom'] = $nom;
+        }
+
+        foreach (['description', 'image_url', 'ordre'] as $col) {
+            if (array_key_exists($col, $body)) {
+                $data[$col] = $body[$col];
+            }
+        }
+
+        if ($data === []) {
+            $this->error('Aucun champ à mettre à jour.', 422);
+            return;
+        }
+
+        $this->categorieModel->update($id, $data);
+
+        $this->success($this->categorieModel->findById($id), 'Catégorie mise à jour.');
+    }
+
+    // ------------------------------------------------------------------
+    // DELETE /admin/categories/:id
+    //
+    // Suppression protégée : tant que des produits sont rattachés, l'appel
+    // renvoie 409 avec le détail de l'impact. Le client doit confirmer via
+    // ?force=1 pour que la suppression soit effectuée.
+    // ------------------------------------------------------------------
+
+    public function deleteCategorie(array $params = []): void
+    {
+        if (!$this->requireAdmin()) {
+            return;
+        }
+
+        $id = (int) ($params['id'] ?? 0);
+
+        if ($this->categorieModel->findById($id) === null) {
+            $this->error('Catégorie introuvable.', 404);
+            return;
+        }
+
+        $impact = $this->categorieModel->countProduits($id);
+        $total  = $impact['principale'] + $impact['liaisons'];
+        $force  = in_array((string) ($_GET['force'] ?? ''), ['1', 'true'], true);
+
+        if ($total > 0 && !$force) {
+            $this->json([
+                'success' => false,
+                'error'   => 'Catégorie utilisée par des produits. Confirmez avec force=1.',
+                'details' => $impact,
+            ], 409);
+            return;
+        }
+
+        $this->categorieModel->delete($id);
+
+        $this->success($impact, 'Catégorie supprimée.');
     }
 }

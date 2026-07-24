@@ -165,6 +165,14 @@ export const adminAPI = {
   toggleBoutique:  (id) => api.put(`/admin/boutiques/${id}/toggle`),
   getAvis:         () => api.get('/admin/avis'),
   deleteAvis:      (id) => api.delete(`/admin/avis/${id}`),
+
+  // Catégories
+  getCategories:   () => api.get('/admin/categories'),
+  createCategorie: (payload) => api.post('/admin/categories', payload),
+  updateCategorie: (id, payload) => api.put(`/admin/categories/${id}`, payload),
+  // force=1 confirme la suppression malgré des produits rattachés
+  deleteCategorie: (id, force = false) =>
+    api.delete(`/admin/categories/${id}${force ? '?force=1' : ''}`),
 };
 
 // ── AI Search ─────────────────────────────────────────────────────────────────

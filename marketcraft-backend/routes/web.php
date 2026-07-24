@@ -183,6 +183,18 @@ $router->get('/admin/avis', [AdminController::class, 'avis'], ['auth']);
 // DELETE /admin/avis/:id             – Supprimer un avis
 $router->delete('/admin/avis/:id', [AdminController::class, 'deleteAvis'], ['auth']);
 
+// GET    /admin/categories           – Liste des catégories (+ nb produits)
+$router->get('/admin/categories', [AdminController::class, 'categories'], ['auth']);
+
+// POST   /admin/categories           – Créer une catégorie
+$router->post('/admin/categories', [AdminController::class, 'createCategorie'], ['auth']);
+
+// PUT    /admin/categories/:id       – Modifier une catégorie
+$router->put('/admin/categories/:id', [AdminController::class, 'updateCategorie'], ['auth']);
+
+// DELETE /admin/categories/:id       – Supprimer (force=1 pour confirmer)
+$router->delete('/admin/categories/:id', [AdminController::class, 'deleteCategorie'], ['auth']);
+
 // =========================================================================
 // ROUTE DE SANTÉ
 // =========================================================================
