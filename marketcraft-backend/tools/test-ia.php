@@ -41,6 +41,17 @@ if ($apiKey === '') {
 }
 
 printf("  cle    : %d caracteres, debut « %s… »\n", strlen($apiKey), substr($apiKey, 0, 6));
+
+if (!str_starts_with($apiUrl, 'http://') && !str_starts_with($apiUrl, 'https://')) {
+    echo "\nECHEC DE CONFIGURATION\n";
+    echo "  AI_API_URL ne contient pas une URL mais : « {$apiUrl} »\n";
+    echo "  Vous avez probablement colle la cle sur la mauvaise ligne.\n\n";
+    echo "  Le .env doit ressembler a ceci :\n";
+    echo "    AI_API_KEY=
+    echo "    AI_MODEL=\n";
+    echo "    AI_API_URL=\n";
+    exit(1);
+}
 printf("  modele : %s\n", $model);
 printf("  url    : %s\n\n", $apiUrl);
 

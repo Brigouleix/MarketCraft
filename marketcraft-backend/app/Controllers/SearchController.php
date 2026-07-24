@@ -184,6 +184,15 @@ class SearchController extends Controller
             return null;
         }
 
+        // Confusion frequente : coller la cle sur la ligne AI_API_URL. On le
+        // detecte ici plutot que de laisser cURL tenter une resolution DNS.
+        if (!str_starts_with($apiUrl, 'http://') && !str_starts_with($apiUrl, 'https://')) {
+            $this->iaErreur = 'AI_API_URL n\'est pas une URL valide (« ' . substr($apiUrl, 0, 20)
+                . '… »). La clé doit être sur la ligne AI_API_KEY.';
+            error_log('[SearchController] ' . $this->iaErreur);
+            return null;
+        }
+
         foreach (self::KEY_PLACEHOLDERS as $motif) {
             if (stripos($apiKey, $motif) !== false) {
                 $this->iaErreur = 'AI_API_KEY contient encore une valeur d\'exemple.';
