@@ -216,6 +216,10 @@ SYSTEM;
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $requestBody,
             CURLOPT_TIMEOUT        => 15, // 15 secondes max
+            // Sans User-Agent explicite, cURL n'en envoie aucun et Cloudflare,
+            // qui protege l'API, rejette la requete en 403 « Access denied »
+            // avant meme de verifier la cle.
+            CURLOPT_USERAGENT      => 'MarketCraft/1.0 (+PHP cURL)',
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
                 'Authorization: Bearer ' . $apiKey,
@@ -246,6 +250,7 @@ SYSTEM;
             $this->iaErreur = match (true) {
                 $httpCode === 429 => 'Quota du palier gratuit atteint (429). Réessayez dans une minute.',
                 $httpCode === 401 => 'Clé API refusée (401). Vérifiez GROQ_API_KEY.',
+                $httpCode === 403 => 'Requête bloquée en amont (403). Cloudflare rejette les appels sans User-Agent, ou votre IP est filtrée.',
                 default => "Le fournisseur IA a répondu {$httpCode} pour le modèle « {$model} » : "
                     . substr((string) $response, 0, 300),
             };

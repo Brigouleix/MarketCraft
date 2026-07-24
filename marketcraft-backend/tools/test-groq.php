@@ -64,6 +64,7 @@ curl_setopt_array($ch, [
     CURLOPT_POST           => true,
     CURLOPT_POSTFIELDS     => $corps,
     CURLOPT_TIMEOUT        => 20,
+    CURLOPT_USERAGENT      => 'MarketCraft/1.0 (+PHP cURL)',
     CURLOPT_HTTPHEADER     => [
         'Content-Type: application/json',
         'Authorization: Bearer ' . $apiKey,
@@ -100,6 +101,10 @@ if ($httpCode === 200 && isset($data['choices'][0]['message']['content'])) {
     echo "  Cle refusee. Regenerez-la sur console.groq.com/keys.\n";
 } elseif ($httpCode === 429) {
     echo "  Quota du palier gratuit atteint. Reessayez dans une minute.\n";
+} elseif ($httpCode === 403) {
+    echo "  Bloque en amont par Cloudflare.\n";
+    echo "  Si ce script envoie bien un User-Agent, c'est votre IP qui est\n";
+    echo "  filtree : desactivez tout VPN/proxy, ou essayez un autre reseau.\n";
 } elseif ($httpCode === 400) {
     echo "  Requete refusee. Cause la plus frequente : modele retire.\n";
     echo "  Voir console.groq.com/docs/deprecations, puis renseignez\n";
