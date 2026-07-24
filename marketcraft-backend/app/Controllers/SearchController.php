@@ -211,7 +211,11 @@ Tu es un assistant e-commerce. Quand l'utilisateur décrit ce qu'il cherche, ext
   "prix_min": null,
   "message": "Message convivial expliquant ce que tu cherches (1 phrase max, tutoyer)"
 }
-Les keywords doivent être les termes de recherche SQL (noms de matériaux, types d'objets, etc.). Par exemple pour "j'aimerais un ensemble de couverts dorés avec une table en bois": keywords: ["couverts", "dorés", "métal", "table", "bois", "mobilier", "or"], message: "Je cherche des couverts dorés et une table en bois pour toi ! 🎨"
+Les keywords doivent être les termes de recherche SQL (noms de matériaux, types d'objets, etc.).
+
+REGLE IMPORTANTE : 6 mots-clés maximum, uniquement les plus discriminants. Les mots-clés sont combinés en OU dans une requête SQL : un terme trop générique ramènerait tout le catalogue. N'invente pas de variantes non demandées et n'ajoute jamais de termes vagues comme "design", "moderne", "matériau", "qualité", "artisanal".
+
+Exemple pour "j'aimerais un ensemble de couverts dorés avec une table en bois": keywords: ["couverts", "doré", "table", "bois"], message: "Je cherche des couverts dorés et une table en bois pour toi ! 🎨"
 SYSTEM;
 
         // Corps de la requête au format OpenAI (chat completions).
@@ -316,6 +320,12 @@ SYSTEM;
             $this->iaErreur = 'Le modèle n\'a pas renvoyé de JSON exploitable : ' . substr($content, 0, 200);
             error_log('[SearchController] ' . $this->iaErreur);
             return null;
+        }
+
+        // Garde-fou : quelle que soit la consigne, le modèle reste libre de
+        // sur-générer. Les mots-clés étant combinés en OU, on plafonne.
+        if (isset($decoded['keywords']) && is_array($decoded['keywords'])) {
+            $decoded['keywords'] = array_slice(array_values($decoded['keywords']), 0, 6);
         }
 
         // Validation minimale : doit contenir un tableau keywords
