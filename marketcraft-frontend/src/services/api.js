@@ -167,4 +167,10 @@ export const adminAPI = {
   deleteAvis:      (id) => api.delete(`/admin/avis/${id}`),
 };
 
+// ── AI Search ─────────────────────────────────────────────────────────────────
+export const searchAPI = {
+  aiSearch: (query) => api.post('/search/ai', { query }),
+  search: (params) => api.get('/search', { params }),
+};
+
 export default api;

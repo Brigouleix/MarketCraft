@@ -19,6 +19,7 @@ const AdminPage = lazy(() => import('./pages/AdminPage'));
 const BoutiquesPage = lazy(() => import('./pages/BoutiquesPage'));
 const BoutiquePage = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const BuyerStatsPage = lazy(() => import('./pages/BuyerStatsPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/produits/:id" element={<ProductDetailPage />} />
             <Route path="/boutiques" element={<BoutiquesPage />} />
             <Route path="/boutiques/:id" element={<BoutiquePage />} />
+            <Route path="/search" element={<SearchResultsPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
