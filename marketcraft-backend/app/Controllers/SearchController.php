@@ -29,6 +29,12 @@ class SearchController extends Controller
     // Nombre maximum de tokens pour la réponse Claude
     private const MAX_TOKENS = 512;
 
+    /**
+     * Motif du dernier échec de l'appel IA. Exposé dans la réponse HTTP
+     * uniquement en développement, pour éviter d'aller fouiller les logs.
+     */
+    private ?string $iaErreur = null;
+
     // -------------------------------------------------------------------------
     // POST /search/ai
     // -------------------------------------------------------------------------
@@ -81,6 +87,9 @@ class SearchController extends Controller
                 // Permet au client de distinguer une vraie interprétation IA
                 // d'un simple repli sur les mots-clés.
                 'ia_active'  => $aiResult !== null,
+                // Diagnostic visible uniquement hors production.
+                'ia_erreur'  => (($_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production') !== 'production')
+                    ? $this->iaErreur : null,
                 'ai_message' => $aiMessage,
                 'keywords'   => $keywords,
                 'products'   => $products,
@@ -138,11 +147,10 @@ class SearchController extends Controller
         // mais provoque un 401 côté Anthropic. On la traite comme une absence
         // de clé, en le signalant explicitement dans les logs.
         if ($apiKey === '' || !str_starts_with($apiKey, 'sk-ant-')) {
-            error_log(
-                $apiKey === ''
-                    ? '[SearchController] ANTHROPIC_API_KEY absente : recherche IA désactivée, repli sur les mots-clés.'
-                    : '[SearchController] ANTHROPIC_API_KEY invalide (doit commencer par « sk-ant- ») : repli sur les mots-clés.'
-            );
+            $this->iaErreur = $apiKey === ''
+                ? 'ANTHROPIC_API_KEY absente du .env (ou serveur PHP non redémarré).'
+                : 'ANTHROPIC_API_KEY présente mais ne commence pas par « sk-ant- ».';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
@@ -202,7 +210,12 @@ SYSTEM;
 
         // Vérification des erreurs réseau
         if ($response === false || $curlError !== '') {
-            error_log('[SearchController] Appel Anthropic échoué (réseau) : ' . $curlError);
+            // Sous XAMPP/Windows, php.ini ne définit souvent pas curl.cainfo :
+            // toute requête HTTPS échoue alors sur la vérification du certificat.
+            $this->iaErreur = str_contains($curlError, 'certificate') || str_contains($curlError, 'SSL')
+                ? "cURL ne peut pas vérifier le certificat TLS ({$curlError}). Renseignez curl.cainfo dans php.ini."
+                : "Appel réseau vers Anthropic échoué : {$curlError}";
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
@@ -210,7 +223,8 @@ SYSTEM;
         if ($httpCode < 200 || $httpCode >= 300) {
             // Le corps de la réponse contient le motif exact du refus
             // (clé invalide, modèle inconnu, quota dépassé…).
-            error_log("[SearchController] Anthropic a répondu {$httpCode} : " . substr((string) $response, 0, 500));
+            $this->iaErreur = "Anthropic a répondu {$httpCode} : " . substr((string) $response, 0, 300);
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
@@ -218,7 +232,8 @@ SYSTEM;
         $apiResponse = json_decode((string) $response, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log('[SearchController] Réponse Anthropic illisible : ' . json_last_error_msg());
+            $this->iaErreur = 'Réponse Anthropic illisible : ' . json_last_error_msg();
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
@@ -226,6 +241,8 @@ SYSTEM;
         $content = $apiResponse['content'][0]['text'] ?? null;
 
         if ($content === null || !is_string($content)) {
+            $this->iaErreur = 'Réponse Anthropic sans bloc de texte exploitable.';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
@@ -236,11 +253,15 @@ SYSTEM;
         $decoded = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            $this->iaErreur = 'Claude n\'a pas renvoyé de JSON exploitable : ' . substr($content, 0, 200);
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
         // Validation minimale : doit contenir un tableau keywords
         if (!isset($decoded['keywords']) || !is_array($decoded['keywords'])) {
+            $this->iaErreur = 'JSON reçu sans tableau « keywords ».';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
