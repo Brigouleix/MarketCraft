@@ -26,7 +26,7 @@
 -- -----------------------------------------------------------------------------
 
 INSERT INTO `categories` (`parent_id`, `nom`, `slug`, `description`, `ordre`)
-SELECT NULL, 'Objet', 'objet', 'Type d''objet artisanal', 0
+SELECT NULL, 'Objet', 'objet', 'Nature de la piece artisanale', 0
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `categories` WHERE `slug` = 'objet');
 
@@ -40,12 +40,15 @@ WHERE NOT EXISTS (SELECT 1 FROM `categories` WHERE `slug` = 'materiau');
 --    (toutes sauf « Bois », qui devient un materiau)
 -- -----------------------------------------------------------------------------
 
+-- La clause EXISTS evite d'ecrire NULL si la racine n'a pas ete creee :
+-- sans elle, une sous-requete vide affecterait silencieusement NULL.
 UPDATE `categories`
 SET `parent_id` = (SELECT `id` FROM (SELECT `id` FROM `categories` WHERE `slug` = 'objet') AS t)
 WHERE `slug` IN (
   'ceramique', 'bijoux', 'textile', 'decoration-maison',
   'menuiserie', 'poterie', 'accessoires', 'couture'
-);
+)
+AND EXISTS (SELECT 1 FROM (SELECT `id` FROM `categories` WHERE `slug` = 'objet') AS g);
 
 -- -----------------------------------------------------------------------------
 -- 3. « Bois » passe sous « Materiau »
@@ -53,7 +56,8 @@ WHERE `slug` IN (
 
 UPDATE `categories`
 SET `parent_id` = (SELECT `id` FROM (SELECT `id` FROM `categories` WHERE `slug` = 'materiau') AS t)
-WHERE `slug` = 'bois';
+WHERE `slug` = 'bois'
+AND EXISTS (SELECT 1 FROM (SELECT `id` FROM `categories` WHERE `slug` = 'materiau') AS g);
 
 -- -----------------------------------------------------------------------------
 -- 4. Les neuf materiaux supplementaires
