@@ -1,6 +1,7 @@
 /**
  * AISearchBar.jsx
- * Modal de recherche en langage naturel propulsé par Claude (IA).
+ * Modal de recherche en langage naturel propulsé par un modèle de langage.
+ * Le fournisseur est configurable côté serveur (voir SearchController).
  * S'ouvre depuis la Navbar via la prop `isOpen` / `onClose`.
  *
  * Props :
@@ -218,7 +219,7 @@ export default function AISearchBar({ isOpen, onClose }) {
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-700">
-                  🤖 Claude analyse votre recherche
+                  🤖 L'IA analyse votre recherche
                   <LoadingDots />
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Extraction des mots-clés en cours</p>
@@ -325,7 +326,7 @@ export default function AISearchBar({ isOpen, onClose }) {
               <div>
                 <p className="font-medium text-gray-600">Décrivez votre recherche ci-dessus</p>
                 <p className="text-sm text-gray-400 mt-1">
-                  Claude comprend le langage naturel — soyez précis !
+                  L'IA comprend le langage naturel — soyez précis !
                 </p>
               </div>
             </div>
