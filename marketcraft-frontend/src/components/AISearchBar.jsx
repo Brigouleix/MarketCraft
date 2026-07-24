@@ -13,6 +13,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Sparkles, Search, ChevronRight } from 'lucide-react';
 import ProductCard from './ProductCard';
+import { searchAPI } from '../services/api';
 
 // Suggestions rapides affichées sous le textarea
 const SUGGESTIONS = [
@@ -86,23 +87,21 @@ export default function AISearchBar({ isOpen, onClose }) {
     setResults(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/search/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: trimmed }),
-      });
+      // On passe par le client axios partagé plutôt qu'un fetch en dur :
+      // l'URL de l'API vient de la configuration, et les intercepteurs
+      // (JWT, gestion du 401) s'appliquent comme partout ailleurs.
+      const { data } = await searchAPI.aiSearch(trimmed);
 
-      if (!response.ok) {
-        throw new Error(`Erreur serveur : ${response.status}`);
-      }
-
-      const data = await response.json();
-      setResults(data);
+      // L'API enveloppe toujours sa charge utile dans { success, data }.
+      // Sans ce déballage, results.ai_message et results.products sont
+      // undefined et le modal reste vide quoi que renvoie le serveur.
+      setResults(data?.data ?? data);
     } catch (err) {
+      const statut = err.response?.status;
       setError(
-        err.message?.includes('fetch')
-          ? "Impossible de joindre le serveur. Vérifiez que le backend est démarré."
-          : err.message || "Une erreur inattendue s'est produite."
+        statut
+          ? (err.response?.data?.error || `Erreur serveur : ${statut}`)
+          : "Impossible de joindre le serveur. Vérifiez que le backend est démarré."
       );
     } finally {
       setIsLoading(false);
