@@ -128,10 +128,21 @@ function MultiImageUploader({ value = [], onChange }) {
     try {
       const fileArr = Array.from(files).slice(0, 5 - value.length);
       const { data } = await uploadAPI.images(fileArr);
-      onChange([...value, ...data.urls]);
-      toast.success(`${data.urls.length} image(s) uploadée(s) !`);
-    } catch {
-      toast.error("Erreur d'upload.");
+      const urls = data.urls || [];
+
+      onChange([...value, ...urls]);
+
+      // Succès partiel : certaines images sont passées, d'autres non.
+      if (data.rejets?.length) {
+        toast.error(`${data.rejets.length} image(s) refusée(s) : ${data.rejets[0].motif}`, { duration: 6000 });
+      }
+      if (urls.length) {
+        toast.success(`${urls.length} image(s) uploadée(s) !`);
+      }
+    } catch (err) {
+      // Le serveur renvoie désormais le motif exact du refus.
+      const rejets = err.response?.data?.details?.rejets;
+      toast.error(rejets?.[0]?.motif || err.response?.data?.error || "Erreur d'upload.", { duration: 6000 });
     } finally {
       setUploading(false);
     }
