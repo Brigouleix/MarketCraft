@@ -1,0 +1,128 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AvisController;
+use App\Http\Controllers\BoutiqueController;
+use App\Http\Controllers\CategorieController;
+use App\Http\Controllers\CommandeController;
+use App\Http\Controllers\HealthController;
+use App\Http\Controllers\ProduitController;
+use App\Http\Controllers\RecommandationController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Routes de l'API MarketCraft
+|--------------------------------------------------------------------------
+|
+| Le prefixe /api est applique par bootstrap/app.php (apiPrefix: 'api').
+| Les chemins ci-dessous s'ecrivent donc sans lui.
+|
+| Middlewares :
+|   jwt                    jeton Bearer valide et compte actif
+|   role:vendeur,admin     controle de role, a placer apres jwt
+|
+| Le controle de role vit ici plutot que dans les controleurs : une route
+| ajoutee sans middleware saute aux yeux a la relecture de ce fichier,
+| alors qu'un controle oublie au fond d'une methode passe inapercu.
+|
+*/
+
+// =========================================================================
+// SANTE
+// =========================================================================
+
+Route::get('/health', HealthController::class);
+
+// =========================================================================
+// AUTHENTIFICATION
+// =========================================================================
+
+Route::prefix('auth')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/refresh', [AuthController::class, 'refresh']);
+    // Defi captcha, exige a partir du 3e echec de connexion.
+    Route::get('/captcha', [AuthController::class, 'captcha']);
+
+    Route::middleware('jwt')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::put('/me', [AuthController::class, 'updateMe']);
+        Route::delete('/me', [AuthController::class, 'deleteMe']);
+    });
+});
+
+// =========================================================================
+// PRODUITS
+// =========================================================================
+
+Route::get('/products', [ProduitController::class, 'index']);
+
+// Les routes litterales precedent /products/{id} : sans cela « similar »
+// serait capture comme identifiant.
+Route::get('/products/{id}/avis', [AvisController::class, 'indexByProduct'])->whereNumber('id');
+Route::get('/products/{id}/similar', [RecommandationController::class, 'pourProduit'])->whereNumber('id');
+Route::get('/products/{id}/recommendations', [RecommandationController::class, 'pourProduit'])->whereNumber('id');
+Route::get('/products/{id}', [ProduitController::class, 'show'])->whereNumber('id');
+
+Route::middleware('jwt')->group(function () {
+    Route::post('/products', [ProduitController::class, 'store'])->middleware('role:vendeur,admin');
+    Route::put('/products/{id}', [ProduitController::class, 'update'])->whereNumber('id');
+    Route::delete('/products/{id}', [ProduitController::class, 'destroy'])->whereNumber('id');
+
+    Route::post('/products/{id}/avis', [AvisController::class, 'store'])->whereNumber('id');
+});
+
+// =========================================================================
+// RECOMMANDATION IA (option C du cahier des charges)
+// =========================================================================
+
+Route::post('/cart/recommendations', [RecommandationController::class, 'pourPanier']);
+
+// =========================================================================
+// BOUTIQUES
+// =========================================================================
+
+Route::get('/boutiques', [BoutiqueController::class, 'index']);
+
+// Doit rester avant /boutiques/{id}, sinon « me » est lu comme un id.
+Route::get('/boutiques/me', [BoutiqueController::class, 'me'])->middleware('jwt');
+
+Route::get('/boutiques/{id}', [BoutiqueController::class, 'show'])->whereNumber('id');
+
+Route::middleware('jwt')->group(function () {
+    Route::post('/boutiques', [BoutiqueController::class, 'store']);
+    Route::put('/boutiques/{id}', [BoutiqueController::class, 'update'])->whereNumber('id');
+    Route::delete('/boutiques/{id}', [BoutiqueController::class, 'destroy'])->whereNumber('id');
+});
+
+// =========================================================================
+// COMMANDES
+// =========================================================================
+
+Route::middleware('jwt')->group(function () {
+    Route::get('/orders', [CommandeController::class, 'index']);
+    Route::get('/orders/{id}', [CommandeController::class, 'show'])->whereNumber('id');
+    Route::post('/orders', [CommandeController::class, 'store']);
+    Route::put('/orders/{id}/status', [CommandeController::class, 'updateStatus'])
+        ->whereNumber('id')
+        ->middleware('role:vendeur,admin');
+    Route::delete('/orders/{id}', [CommandeController::class, 'destroy'])->whereNumber('id');
+});
+
+// =========================================================================
+// AVIS
+// =========================================================================
+
+Route::delete('/avis/{id}', [AvisController::class, 'destroy'])
+    ->whereNumber('id')
+    ->middleware('jwt');
+
+// =========================================================================
+// CATEGORIES
+// =========================================================================
+
+Route::get('/categories', [CategorieController::class, 'index']);

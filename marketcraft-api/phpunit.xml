@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:V0ZBSVRNQUlOTUFSS0VUQ1JBRlRURVNUS0VZMDE="/>
+        <env name="APP_DEBUG" value="true"/>
+        <!-- La suite tourne sur SQLite en memoire : ni base MySQL a
+             provisionner, ni etat residuel entre deux executions. Les
+             triggers et la procedure stockee sont propres a MySQL et
+             sont ignores par leur migration sous SQLite. -->
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="JWT_SECRET" value="cle_de_test_uniquement_surtout_pas_en_production_0123456789"/>
+        <env name="AI_API_KEY" value=""/>
+        <env name="AUTH_CAPTCHA_ENABLED" value="false"/>
+    </php>
+</phpunit>
