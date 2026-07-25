@@ -7,7 +7,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Les branches de travail sont incluses : une CI qui ne tourne que sur
+    # main ne previent des regressions qu'une fois la fusion faite.
+    branches: [main, 'feat/**', 'fix/**']
   pull_request:
     branches: [main]
 
@@ -39,6 +41,69 @@ jobs:
 
       - name: Exécuter PHPUnit
         run: vendor/bin/phpunit --colors=never
+
+  # ----------------------------------------------------------
+  # Back-end Laravel 11 : PHPUnit (49 tests / 179 assertions)
+  #
+  # Coexiste avec le job `backend-tests` ci-dessus : les deux
+  # back-ends sont maintenus en parallele jusqu'a la bascule
+  # complete du front. Retirer l'ancien job le jour ou
+  # marketcraft-backend sortira du depot.
+  # ----------------------------------------------------------
+  api-tests:
+    name: API Laravel — PHPUnit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketcraft-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          # sqlite3 et pdo_sqlite sont indispensables : la suite tourne
+          # sur une base en memoire, sans service MySQL a provisionner.
+          extensions: pdo, pdo_sqlite, sqlite3, mbstring, bcmath, intl, fileinfo
+          coverage: none
+
+      - name: Mettre en cache les dependances Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('marketcraft-api/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Installer les dependances
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Analyse syntaxique
+        run: |
+          find app config database routes tests -name "*.php" -print0 \
+            | xargs -0 -n1 php -l \
+            | (! grep -v "No syntax errors")
+
+      - name: Verifier qu aucun secret n est commite
+        run: |
+          # .env ne doit jamais entrer dans le depot : il porte JWT_SECRET,
+          # les identifiants de base et la cle du fournisseur IA.
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env est suivi par Git — retirez-le immediatement."
+            exit 1
+          fi
+          echo "OK : aucun .env suivi."
+
+      - name: Executer la suite de tests
+        run: php artisan test
+        env:
+          # Valeurs de test uniquement. Les vraies cles vivent dans .env,
+          # jamais dans le depot ni dans ce fichier.
+          APP_ENV: testing
+          APP_KEY: base64:V0ZBSVRNQUlOTUFSS0VUQ1JBRlRURVNUS0VZMDE=
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          JWT_SECRET: cle_de_ci_uniquement_surtout_pas_en_production_0123456789
 
   # ----------------------------------------------------------
   # Frontend React : Jest + RTL (12 tests) puis build strict
