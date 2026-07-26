@@ -9,7 +9,7 @@
  *   - onClose  {function}  : callback pour fermer le modal
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Sparkles, Search, ChevronRight } from 'lucide-react';
 import ProductCard from './ProductCard';
@@ -48,22 +48,29 @@ export default function AISearchBar({ isOpen, onClose }) {
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Réinitialise l'état et ferme le modal.
+   *
+   * Enveloppée dans useCallback et déclarée avant l'effet qui l'utilise :
+   * sans cela, le gestionnaire de la touche Échap capturait la version du
+   * premier rendu et refermait le modal sur un état périmé. Les setters de
+   * useState étant stables, `onClose` est la seule dépendance.
+   */
+  const handleClose = useCallback(() => {
+    setResults(null);
+    setError(null);
+    setQuery('');
+    onClose();
+  }, [onClose]);
+
   // Fermeture avec la touche Escape
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') handleClose(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, []);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────────
-
-  /** Réinitialise l'état et ferme le modal */
-  const handleClose = () => {
-    setResults(null);
-    setError(null);
-    setQuery('');
-    onClose();
-  };
+  }, [handleClose]);
 
   /** Clic sur l'overlay sombre → ferme */
   const handleOverlayClick = (e) => {
