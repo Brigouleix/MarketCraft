@@ -61,9 +61,16 @@ class AuthController extends Controller
 
         // Le role vient du client : sans cette liste blanche, n'importe qui
         // se creerait un compte administrateur a l'inscription.
-        $role = in_array($donnees['role'] ?? '', ['client', 'vendeur'], true)
-            ? $donnees['role']
-            : 'client';
+        //
+        // « acheteur » est accepte comme synonyme de « client » : c'est le
+        // libelle qu'envoie le formulaire d'inscription, alors que la
+        // colonne SQL ne connait que client, vendeur et admin. Sans cet
+        // alias la valeur tombait dans le repli et fonctionnait par
+        // accident — donc en silence, jusqu'au jour ou le repli change.
+        $demande = $donnees['role'] ?? '';
+        $demande = $demande === 'acheteur' ? 'client' : $demande;
+
+        $role = in_array($demande, ['client', 'vendeur'], true) ? $demande : 'client';
 
         $user = User::create([
             'nom'           => trim($donnees['nom']),

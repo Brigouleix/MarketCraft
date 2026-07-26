@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   User,
@@ -19,8 +19,11 @@ import {
   EyeOff,
   Trash2,
   ShieldAlert,
+  MessageSquarePlus,
+  ChevronRight,
 } from 'lucide-react';
-import { authAPI, ordersAPI } from '../services/api';
+import { authAPI, ordersAPI, recommandationsAPI } from '../services/api';
+import RecommandationsIA from '../components/RecommandationsIA';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 
@@ -575,35 +578,97 @@ export default function ProfilePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-secondary-100">
-                  {orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-secondary-50 transition-colors"
-                    >
-                      <td className="px-5 py-4 font-mono text-gray-600">#{order.id}</td>
-                      <td className="px-5 py-4 text-gray-600">
-                        {new Date(order.created_at).toLocaleDateString('fr-FR', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </td>
-                      <td className="px-5 py-4 text-gray-600">
-                        {order.nb_articles || 1} article
-                        {(order.nb_articles || 1) > 1 ? 's' : ''}
-                      </td>
-                      <td className="px-5 py-4 font-semibold text-primary">
-                        {Number(order.montant_total ?? order.total ?? 0).toFixed(2)} €
-                      </td>
-                      <td className="px-5 py-4">
-                        <StatusBadge statut={order.statut} />
-                      </td>
-                    </tr>
-                  ))}
+                  {orders.map((order) => {
+                    const lignes = order.lignes || [];
+                    const livree = order.statut === 'livree';
+
+                    return (
+                      <React.Fragment key={order.id}>
+                        <tr className="hover:bg-secondary-50 transition-colors">
+                          <td className="px-5 py-4 font-mono text-gray-600">#{order.id}</td>
+                          <td className="px-5 py-4 text-gray-600">
+                            {new Date(order.created_at).toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-5 py-4 text-gray-600">
+                            {order.nb_articles || 1} article
+                            {(order.nb_articles || 1) > 1 ? 's' : ''}
+                          </td>
+                          <td className="px-5 py-4 font-semibold text-primary">
+                            {Number(order.montant_total ?? order.total ?? 0).toFixed(2)} €
+                          </td>
+                          <td className="px-5 py-4">
+                            <StatusBadge statut={order.statut} />
+                          </td>
+                        </tr>
+
+                        {/* Détail des articles : c'est le seul chemin depuis
+                            l'historique vers la fiche produit, donc vers le
+                            dépôt d'un avis. L'API n'autorise l'avis qu'après
+                            achat — inutile de proposer le lien avant la
+                            livraison. */}
+                        {lignes.length > 0 && (
+                          <tr className="bg-secondary-50/50">
+                            <td colSpan={5} className="px-5 pb-4 pt-0">
+                              <ul className="space-y-1.5">
+                                {lignes.map((ligne, i) => (
+                                  <li
+                                    key={`${order.id}-${ligne.produit_id}-${i}`}
+                                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+                                  >
+                                    <Link
+                                      to={`/produits/${ligne.produit_id}`}
+                                      className="text-gray-700 hover:text-primary transition-colors inline-flex items-center gap-1"
+                                    >
+                                      <ChevronRight size={13} className="text-secondary-400" />
+                                      {ligne.nom_produit}
+                                      {ligne.quantite > 1 && (
+                                        <span className="text-gray-400"> × {ligne.quantite}</span>
+                                      )}
+                                    </Link>
+
+                                    {livree && (
+                                      <Link
+                                        to={`/produits/${ligne.produit_id}#avis`}
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                      >
+                                        <MessageSquarePlus size={13} />
+                                        Donner mon avis
+                                      </Link>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+
+                              {!livree && (
+                                <p className="text-xs text-gray-400 mt-2">
+                                  Vous pourrez déposer un avis une fois la commande livrée.
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
+
+          {/* Suggestions fondees sur l'historique d'achat — module IA du
+              cahier des charges (option C). Le composant ne rend rien tant
+              que le client n'a pas commande, ce qui evite un encart vide
+              sur un compte neuf. */}
+          <RecommandationsIA
+            cleCache="historique"
+            recuperer={() => recommandationsAPI.parHistorique(4)}
+            titre="Cela pourrait vous plaire"
+            sousTitre="D'après les artisans et les matières de vos commandes précédentes."
+          />
         </div>
       )}
     </div>

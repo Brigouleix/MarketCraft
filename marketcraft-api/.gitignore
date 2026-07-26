@@ -2,6 +2,8 @@
 /node_modules
 /public/uploads/*
 !/public/uploads/.gitkeep
+# Repertoire d'ecriture de la suite de tests
+/public/uploads-test
 /storage/*.key
 /storage/framework/cache/*
 !/storage/framework/cache/data/.gitkeep

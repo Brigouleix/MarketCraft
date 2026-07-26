@@ -171,29 +171,116 @@ requête.
 
 ---
 
-## 5.8 Un vendeur ne peut pas lire les commandes qu'il doit traiter
+## 5.8 Un vendeur ne pouvait pas voir les commandes à préparer — corrigé
 
-`PUT /orders/:id/status` est ouvert aux rôles `vendeur` et `admin`, mais
-`GET /orders/:id` reste réservé au propriétaire de la commande et à
-l'administrateur. Un vendeur peut donc faire passer une commande à
-« expédiée » sans jamais pouvoir en consulter le contenu — ni savoir quels
-articles préparer.
+Dans l'ancien back-end, `GET /orders` filtrait sur `utilisateur_id`. Un
+vendeur ne voyait donc que ses propres achats, jamais les commandes
+contenant ses produits : l'onglet « Mes commandes » du tableau de bord était
+structurellement vide.
 
-Le comportement est **hérité tel quel** de l'ancien back-end, où le même
-cloisonnement existe. Il est reproduit pour ne pas élargir les droits sans
-décision explicite.
+Pire, `PUT /orders/:id/status` n'exigeait que le rôle `vendeur`. **N'importe
+quel vendeur inscrit pouvait faire passer à « livrée » ou « annulée » la
+commande d'une autre boutique**, en incrémentant un identifiant dans l'URL.
+Un cas d'école de *Broken Access Control*.
 
-À trancher avant de porter `GET /dashboard/stats`, qui suppose qu'un vendeur
-accède aux commandes contenant ses produits. Deux options :
+Corrigé sur trois points :
 
-- autoriser `GET /orders` et `GET /orders/:id` à un vendeur **pour les
-  commandes contenant au moins un de ses produits**, en filtrant par
-  `lignes_commande.produit_id` → `produits.boutique_id` → `boutiques.vendeur_id` ;
-- laisser le cloisonnement et exposer les commandes du vendeur uniquement à
-  travers un endpoint dédié au tableau de bord.
+- `GET /orders?scope=ventes` renvoie les commandes contenant au moins un
+  produit du vendeur. Le point de vue est un paramètre explicite, pas une
+  déduction du rôle : un vendeur est aussi un compte, et sa page « Mon
+  compte » ne doit pas se remplir de ses ventes.
+- `GET /orders/:id` s'ouvre au vendeur concerné — il doit savoir quoi
+  préparer.
+- `PUT /orders/:id/status` vérifie désormais que la commande contient un de
+  ses produits.
 
-La première est plus simple et ne casse rien côté front : elle transforme un
-403 en 200 sur des routes que le vendeur n'utilise pas aujourd'hui.
+Le principe : **le rôle dit ce qu'on a le droit de faire, jamais sur quoi.**
+Les deux contrôles sont distincts, et l'oubli du second est l'erreur la plus
+fréquente.
+
+---
+
+## 5.11 Séparation stricte des rôles
+
+Règle métier appliquée après le portage : un compte vendeur vend et n'achète
+pas ; un compte acheteur achète et ne vend pas. Le rôle se choisit à
+l'inscription et n'évolue plus.
+
+Conséquences sur le code hérité :
+
+- `POST /orders` refuse un compte `vendeur` (403).
+- `POST /boutiques` exige le rôle `vendeur`. **La promotion automatique
+  `client` → `vendeur` qui existait à la création d'une boutique a été
+  retirée** : elle contredisait la séparation, et faisait perdre à
+  l'utilisateur la possibilité d'acheter sans qu'il l'ait demandé.
+- Côté interface, le panier et le bouton « Ajouter » disparaissent pour un
+  vendeur. Ce n'est qu'un confort : le refus qui fait foi est côté serveur,
+  l'API restant appelable directement.
+
+À noter pour la démonstration : le parcours complet exige donc **deux
+comptes**, un acheteur et un vendeur.
+
+---
+
+## 5.9 Endpoints ajoutés, absents des 45 du contrat
+
+Cinq routes n'existent pas dans l'ancien back-end. Aucune ne modifie une
+réponse existante : ce sont des ajouts, donc sans risque de régression sur
+le front.
+
+| Route | Statut vis-à-vis du CDC |
+|---|---|
+| `GET /products/:id/similar` | **Attendue par le front**, jamais implémentée — voir §2 |
+| `GET /products/:id/recommendations` | Module IA option C, nom du brief |
+| `POST /cart/recommendations` | Module IA option C, nom du brief |
+| `GET /me/recommendations` | Module IA option C, extension à l'historique d'achat |
+| `GET /auth/captcha` | Support du CAPTCHA exigé par le CDC |
+| `GET /dashboard/concurrence` | **Hors périmètre — voir ci-dessous** |
+
+---
+
+## 5.10 L'analyse concurrentielle est hors périmètre, et c'est assumé
+
+Le cahier des charges impose **un seul** module IA, à choisir parmi trois :
+chatbot SAV, génération de fiches produits, ou recommandation personnalisée.
+C'est l'option C qui a été retenue.
+
+`GET /dashboard/concurrence` ne relève d'aucune des trois. C'est un ajout
+délibéré, pas une confusion sur le périmètre.
+
+**À dire ainsi en soutenance :** le module imposé est la recommandation
+personnalisée, servie par `RecommandationService` sur quatre routes.
+L'analyse concurrentielle est un dépassement, construit sur la même
+architecture de repli. Présentée comme un bonus documenté, elle valorise ;
+présentée comme le module imposé, elle exposerait à la question « et les
+deux autres options, vous les avez écartées pourquoi ? ».
+
+La mention figure à trois endroits du code, pour qu'elle ne se perde pas :
+en-tête de `AnalyseConcurrentielleService`, en-tête du contrôleur, et
+commentaire sur l'onglet du tableau de bord React.
+
+### Le principe qui structure ce service
+
+**Les chiffres sont calculés, jamais générés.** Le modèle de langage ne
+reçoit que des statistiques déjà établies — médiane, min, max, écart en
+pourcentage — et se contente de les commenter. Un prix médian inventé et
+affiché à un vendeur qui s'en servirait pour fixer ses tarifs serait pire
+qu'une absence d'analyse.
+
+Deux garde-fous appliquent cette règle :
+
+- la consigne système interdit explicitement de citer un montant absent des
+  données fournies ;
+- tout identifiant de produit renvoyé par le modèle et absent de la
+  boutique analysée est écarté avant affichage.
+
+Le positionnement se mesure par rapport à la **médiane** et non à la
+moyenne : une pièce d'exception à 900 € ferait passer tout le reste du
+catalogue pour bon marché. Le seuil d'alignement est fixé à 15 % d'écart.
+
+Les tests `ConcurrenceTest` vérifient cette arithmétique sans jamais
+solliciter l'IA — `Http::preventStrayRequests()` interdit tout appel sortant
+pendant la suite.
 
 ---
 

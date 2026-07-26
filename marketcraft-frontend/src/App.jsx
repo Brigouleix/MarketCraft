@@ -20,7 +20,6 @@ const BoutiquesPage = lazy(() => import('./pages/BoutiquesPage'));
 const BoutiquePage = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
-const BuyerStatsPage = lazy(() => import('./pages/BuyerStatsPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
 const LegalNoticePage = lazy(() => import('./pages/LegalNoticePage'));
@@ -88,14 +87,6 @@ export default function App() {
               element={
                 <ProtectedRoute role="vendeur">
                   <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/mes-stats"
-              element={
-                <ProtectedRoute>
-                  <BuyerStatsPage />
                 </ProtectedRoute>
               }
             />

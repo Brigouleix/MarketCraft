@@ -8,7 +8,6 @@ import {
   LogOut,
   LayoutDashboard,
   ShieldCheck,
-  BarChart3,
   UserCircle,
   ChevronDown,
   Hammer,
@@ -123,19 +122,24 @@ export default function Navbar() {
               <span>IA</span>
             </button>
 
-            {/* Cart */}
-            <button
-              onClick={() => openCart(true)}
-              className="relative p-2.5 text-gray-600 hover:text-primary hover:bg-secondary-100 rounded-lg transition-colors"
-              aria-label="Ouvrir le panier"
-            >
-              <ShoppingCart size={20} />
-              {count > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {count > 99 ? '99+' : count}
-                </span>
-              )}
-            </button>
+            {/* Panier — masqué pour un compte vendeur : les rôles sont
+                séparés, un artisan vend et n'achète pas. Le serveur refuse
+                de toute façon POST /orders, ce masquage n'est qu'un confort
+                d'interface. */}
+            {!isVendeur && (
+              <button
+                onClick={() => openCart(true)}
+                className="relative p-2.5 text-gray-600 hover:text-primary hover:bg-secondary-100 rounded-lg transition-colors"
+                aria-label="Ouvrir le panier"
+              >
+                <ShoppingCart size={20} />
+                {count > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {count > 99 ? '99+' : count}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* User menu (desktop) */}
             {isAuthenticated ? (
@@ -162,13 +166,6 @@ export default function Navbar() {
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary-100 hover:text-primary transition-colors"
                     >
                       <UserCircle size={16} /> Mon profil
-                    </Link>
-                    <Link
-                      to="/mes-stats"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary-100 hover:text-primary transition-colors"
-                    >
-                      <BarChart3 size={16} /> Mes statistiques
                     </Link>
                     {isVendeur && (
                       <Link
@@ -264,13 +261,6 @@ export default function Navbar() {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-secondary-100"
               >
                 <UserCircle size={16} /> Mon profil
-              </Link>
-              <Link
-                to="/mes-stats"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-secondary-100"
-              >
-                <BarChart3 size={16} /> Mes statistiques
               </Link>
               {isVendeur && (
                 <Link

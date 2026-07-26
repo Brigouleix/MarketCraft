@@ -35,13 +35,47 @@ class CommandeController extends Controller
         $page  = max(1, (int) $request->query('page', 1));
         $limit = max(1, min(50, (int) $request->query('limit', 20)));
 
-        // Un administrateur voit tout ; les autres ne voient que leurs
-        // propres commandes. Sans ce filtre, l'endpoint exposerait
-        // l'historique d'achat de la plateforme entiere.
-        $base = Commande::query()
-            ->when(! $user->estAdmin(), fn ($q) => $q->where('utilisateur_id', $user->id));
+        // Deux lectures d'une meme ressource, selon le point de vue :
+        //
+        //   par defaut      les commandes PASSEES par l'utilisateur
+        //   ?scope=ventes   les commandes CONTENANT ses produits
+        //
+        // Le parametre est explicite plutot que deduit du role : un vendeur
+        // est aussi un acheteur, et sa page « Mon compte » ne doit pas se
+        // remplir de ses ventes.
+        $ventes = $request->query('scope') === 'ventes';
+
+        if ($ventes && ! $user->aLeRole('vendeur', 'admin')) {
+            return $this->interdit('Forbidden. Seuls les vendeurs consultent leurs ventes.');
+        }
+
+        $base = Commande::query();
+
+        if ($ventes) {
+            // Un administrateur voit toutes les ventes ; un vendeur, celles
+            // qui contiennent au moins un de ses produits.
+            if (! $user->estAdmin()) {
+                $base->whereHas(
+                    'lignes.produit.boutique',
+                    fn ($q) => $q->where('boutiques.vendeur_id', $user->id)
+                );
+            }
+
+            $base->with('utilisateur:id,nom,prenom');
+        } elseif (! $user->estAdmin()) {
+            // Sans ce filtre, l'endpoint exposerait l'historique d'achat de
+            // la plateforme entiere.
+            $base->where('utilisateur_id', $user->id);
+        }
 
         $total = (clone $base)->count();
+
+        // Les lignes accompagnent la vue acheteur : sans elles, impossible
+        // de remonter a la fiche produit depuis l'historique — donc de
+        // deposer un avis apres livraison.
+        if (! $ventes) {
+            $base->with('lignes.produit:id,slug,images');
+        }
 
         $commandes = $base
             ->withCount(['lignes as nb_articles'])
@@ -49,7 +83,19 @@ class CommandeController extends Controller
             ->forPage($page, $limit)
             ->get();
 
-        return $this->pagine(CommandeResource::collection($commandes), $total, $page, $limit);
+        return $this->pagine(
+            array_map(
+                static fn ($c) => CommandeResource::resume(
+                    $c,
+                    avecClient: $ventes,
+                    avecLignes: ! $ventes,
+                ),
+                $commandes->all()
+            ),
+            $total,
+            $page,
+            $limit
+        );
     }
 
     // ------------------------------------------------------------------
@@ -64,9 +110,7 @@ class CommandeController extends Controller
             return $this->nonTrouve('Order not found.');
         }
 
-        $user = $request->user();
-
-        if (! $user->estAdmin() && (int) $commande->utilisateur_id !== (int) $user->id) {
+        if (! $this->peutConsulter($request, $commande)) {
             return $this->interdit();
         }
 
@@ -91,6 +135,16 @@ class CommandeController extends Controller
         ]);
 
         $user = $request->user();
+
+        // Regle metier : un compte vendeur vend, il n'achete pas. La
+        // separation est stricte, et vaut d'abord ici — masquer le panier
+        // cote interface ne protege rien, l'API restant appelable
+        // directement.
+        if ($user->aLeRole('vendeur')) {
+            return $this->interdit(
+                "Un compte vendeur ne peut pas passer commande. Utilisez un compte acheteur."
+            );
+        }
 
         // Les ValidationException levees dans la transaction remontent au
         // gestionnaire global, qui les traduit en 422 avec le detail par
@@ -185,6 +239,13 @@ class CommandeController extends Controller
             return $this->nonTrouve('Order not found.');
         }
 
+        // Le middleware `role:vendeur,admin` ne verifie que le role : sans
+        // ce controle, n'importe quel vendeur pourrait faire passer a
+        // « livree » la commande d'une autre boutique.
+        if (! $this->concerneLeVendeur($request, $commande)) {
+            return $this->interdit("Forbidden. Cette commande ne contient aucun de vos produits.");
+        }
+
         $donnees = $request->validate([
             'statut'       => ['required', 'string', 'in:' . implode(',', Commande::STATUTS)],
             'numero_suivi' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -267,6 +328,45 @@ class CommandeController extends Controller
     // ------------------------------------------------------------------
     // Aides
     // ------------------------------------------------------------------
+
+    /**
+     * Un acheteur consulte ses commandes ; un vendeur, celles qui
+     * contiennent ses produits — il doit bien savoir quoi preparer.
+     */
+    private function peutConsulter(Request $request, Commande $commande): bool
+    {
+        $user = $request->user();
+
+        if ($user->estAdmin()) {
+            return true;
+        }
+
+        if ((int) $commande->utilisateur_id === (int) $user->id) {
+            return true;
+        }
+
+        return $user->aLeRole('vendeur') && $this->contientUnProduitDe($commande, (int) $user->id);
+    }
+
+    private function concerneLeVendeur(Request $request, Commande $commande): bool
+    {
+        $user = $request->user();
+
+        return $user->estAdmin() || $this->contientUnProduitDe($commande, (int) $user->id);
+    }
+
+    /**
+     * La commande contient-elle au moins un produit de ce vendeur ?
+     */
+    private function contientUnProduitDe(Commande $commande, int $vendeurId): bool
+    {
+        return $commande->lignes()
+            ->whereHas(
+                'produit.boutique',
+                fn ($q) => $q->where('boutiques.vendeur_id', $vendeurId)
+            )
+            ->exists();
+    }
 
     private function chargerDetail(int $id): ?Commande
     {

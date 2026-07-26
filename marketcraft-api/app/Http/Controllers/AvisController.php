@@ -8,6 +8,7 @@ use App\Http\Resources\AvisResource;
 use App\Models\Avis;
 use App\Models\Commande;
 use App\Models\Produit;
+use App\Models\User;
 use App\Services\ActivityLogger;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -79,17 +80,16 @@ class AvisController extends Controller
 
         $user = $request->user();
 
-        // Achat verifie : seul un acheteur du produit peut le noter. Sans
-        // cette condition, la note moyenne se pilote depuis n'importe quel
-        // compte cree pour l'occasion.
-        if (! $this->aAchete((int) $user->id, $id)) {
-            return $this->interdit(
-                'Vous ne pouvez laisser un avis que sur un produit que vous avez commande.'
-            );
-        }
+        // Une seule source de verite pour la regle : la meme methode sert
+        // ici et a l'endpoint d'eligibilite. Deux implementations de la
+        // meme condition finissent toujours par diverger, et l'interface
+        // proposerait alors un formulaire que l'API refuse.
+        $eligibilite = $this->evaluerEligibilite($user, $id);
 
-        if (Avis::query()->where('produit_id', $id)->where('utilisateur_id', $user->id)->exists()) {
-            return $this->echec('You have already reviewed this product.', 409);
+        if (! $eligibilite['peut_deposer']) {
+            $statut = $eligibilite['motif'] === 'deja_depose' ? 409 : 403;
+
+            return $this->echec($eligibilite['message'], $statut);
         }
 
         try {
@@ -126,6 +126,27 @@ class AvisController extends Controller
         $avis->load('utilisateur:id,nom,prenom,avatar_url');
 
         return $this->cree(AvisResource::make($avis), 'Review posted.');
+    }
+
+    // ------------------------------------------------------------------
+    // GET /products/:id/avis/eligibilite
+    // ------------------------------------------------------------------
+
+    /**
+     * L'utilisateur connecte peut-il deposer un avis sur ce produit ?
+     *
+     * Existe pour que l'interface n'affiche pas un formulaire voue au
+     * refus. Faire saisir une note et un commentaire pour repondre « non »
+     * apres coup est une faute d'ergonomie : la reponse etait connue avant
+     * la premiere frappe.
+     */
+    public function eligibilite(Request $request, int $id): JsonResponse
+    {
+        if (! Produit::query()->actif()->whereKey($id)->exists()) {
+            return $this->nonTrouve('Product not found.');
+        }
+
+        return $this->ok($this->evaluerEligibilite($request->user(), $id));
     }
 
     // ------------------------------------------------------------------
@@ -196,14 +217,84 @@ class AvisController extends Controller
         ];
     }
 
-    /** Une commande annulee ne vaut pas achat. */
-    private function aAchete(int $utilisateurId, int $produitId): bool
+    /**
+     * Evalue le droit de deposer un avis, et renvoie le motif du refus.
+     *
+     * @return array{peut_deposer: bool, motif: string, message: string}
+     */
+    private function evaluerEligibilite(?User $user, int $produitId): array
     {
-        return Commande::query()
+        if ($user === null) {
+            return [
+                'peut_deposer' => false,
+                'motif'        => 'non_connecte',
+                'message'      => 'Connectez-vous pour déposer un avis.',
+            ];
+        }
+
+        // Un vendeur n'achete pas, il ne peut donc jamais noter. Le dire
+        // explicitement vaut mieux que le laisser deduire d'un « produit
+        // non commande » qui serait trompeur.
+        if ($user->aLeRole('vendeur')) {
+            return [
+                'peut_deposer' => false,
+                'motif'        => 'vendeur',
+                'message'      => 'Un compte vendeur ne dépose pas d\'avis.',
+            ];
+        }
+
+        if (Avis::query()->where('produit_id', $produitId)->where('utilisateur_id', $user->id)->exists()) {
+            return [
+                'peut_deposer' => false,
+                'motif'        => 'deja_depose',
+                'message'      => 'Vous avez déjà donné votre avis sur ce produit.',
+            ];
+        }
+
+        $etat = $this->etatDeLaCommande((int) $user->id, $produitId);
+
+        if ($etat === null) {
+            return [
+                'peut_deposer' => false,
+                'motif'        => 'non_commande',
+                'message'      => 'Vous ne pouvez donner votre avis que sur un produit que vous avez commandé.',
+            ];
+        }
+
+        if ($etat !== 'livree') {
+            return [
+                'peut_deposer' => false,
+                'motif'        => 'non_livre',
+                'message'      => 'Vous pourrez donner votre avis une fois votre commande livrée.',
+            ];
+        }
+
+        return [
+            'peut_deposer' => true,
+            'motif'        => 'ok',
+            'message'      => 'Vous pouvez déposer votre avis.',
+        ];
+    }
+
+    /**
+     * Statut le plus avance parmi les commandes non annulees contenant ce
+     * produit : « livree » l'emporte des qu'une livraison a eu lieu.
+     *
+     * Renvoie null si l'utilisateur n'a jamais commande le produit.
+     */
+    private function etatDeLaCommande(int $utilisateurId, int $produitId): ?string
+    {
+        $statuts = Commande::query()
             ->where('utilisateur_id', $utilisateurId)
             ->where('statut', '!=', 'annulee')
             ->whereHas('lignes', fn ($q) => $q->where('produit_id', $produitId))
-            ->exists();
+            ->pluck('statut');
+
+        if ($statuts->isEmpty()) {
+            return null;
+        }
+
+        return $statuts->contains('livree') ? 'livree' : (string) $statuts->first();
     }
 
     private function estViolationUnicite(QueryException $e): bool

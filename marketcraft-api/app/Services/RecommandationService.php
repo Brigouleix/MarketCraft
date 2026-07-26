@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\LigneCommande;
 use App\Models\Produit;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -103,6 +104,73 @@ class RecommandationService
         );
 
         return $this->classer($candidats, $limite, $this->contextePanier($panier));
+    }
+
+    /**
+     * Recommandations a partir de l'historique d'achat.
+     *
+     * Prolongement direct de l'option C : plutot que le seul panier en
+     * cours, on prend les articles reellement commandes par le client.
+     * Les commandes annulees sont ecartees — elles ne disent rien d'un
+     * gout, seulement d'un renoncement.
+     *
+     * Les produits deja achetes sont exclus des suggestions : proposer a
+     * quelqu'un ce qu'il possede deja est le defaut le plus visible d'un
+     * moteur de recommandation.
+     *
+     * @return array{produits: array<int, Produit>, ia_active: bool, motifs: array<int, string>, source: string}
+     */
+    public function pourHistorique(int $utilisateurId, int $limite = 4): array
+    {
+        $achetes = LigneCommande::query()
+            ->select('lignes_commande.produit_id')
+            ->join('commandes', 'commandes.id', '=', 'lignes_commande.commande_id')
+            ->where('commandes.utilisateur_id', $utilisateurId)
+            ->where('commandes.statut', '!=', 'annulee')
+            // Les achats recents pesent plus lourd que ceux d'il y a un an.
+            ->orderByDesc('commandes.created_at')
+            ->limit(20)
+            ->pluck('lignes_commande.produit_id')
+            ->unique()
+            ->values();
+
+        if ($achetes->isEmpty()) {
+            return [
+                'produits'  => [],
+                'ia_active' => false,
+                'motifs'    => [],
+                'source'    => 'historique_vide',
+            ];
+        }
+
+        $historique = Produit::query()
+            ->whereIn('id', $achetes)
+            ->with(['categories:id,nom', 'categorie:id,nom', 'boutique:id,nom,vendeur_id'])
+            ->get();
+
+        if ($historique->isEmpty()) {
+            return [
+                'produits'  => [],
+                'ia_active' => false,
+                'motifs'    => [],
+                'source'    => 'historique_vide',
+            ];
+        }
+
+        // Reference de gamme : le panier moyen du client, pas son achat le
+        // plus cher — un cadeau exceptionnel ne doit pas fausser toutes ses
+        // recommandations ulterieures.
+        $reference = $historique
+            ->sortBy(fn (Produit $p) => abs((float) $p->prix - $historique->avg(fn (Produit $q) => (float) $q->prix)))
+            ->first();
+
+        $candidats = $this->preselectionner(
+            reference: $reference,
+            exclusions: $achetes->map(static fn ($id) => (int) $id)->all(),
+            panier: $historique,
+        );
+
+        return $this->classer($candidats, $limite, $this->contexteHistorique($historique));
     }
 
     // ------------------------------------------------------------------
@@ -351,6 +419,25 @@ class RecommandationService
         })->implode("\n");
 
         return "Le panier du client contient :\n{$lignes}";
+    }
+
+    /**
+     * @param  Collection<int, Produit> $historique
+     */
+    private function contexteHistorique(Collection $historique): string
+    {
+        $lignes = $historique->map(function (Produit $p) {
+            $categorie = $p->categorie?->nom ?? 'non precisee';
+
+            return "- {$p->nom} ({$categorie}, {$p->prix} EUR)";
+        })->implode("\n");
+
+        $moyen = round((float) $historique->avg(fn (Produit $p) => (float) $p->prix), 2);
+
+        return "Le client a deja achete les articles suivants :\n{$lignes}\n"
+            . "Panier moyen constate : {$moyen} EUR.\n"
+            . 'Suggere des articles complementaires, en evitant de proposer '
+            . 'un equivalent de ce qu il possede deja.';
     }
 
     /**

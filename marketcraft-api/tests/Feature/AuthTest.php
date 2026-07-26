@@ -73,6 +73,27 @@ class AuthTest extends TestCase
         $this->assertSame('client', User::query()->where('email', 'pirate@example.com')->value('role'));
     }
 
+    public function test_le_libelle_acheteur_du_formulaire_devient_le_role_client(): void
+    {
+        // RegisterPage envoie « acheteur », la colonne SQL ne connait que
+        // client / vendeur / admin. Sans cet alias la valeur tombait dans
+        // le repli et fonctionnait par accident.
+        $this->postJson('/api/auth/register', [
+            'nom' => 'Lemoine', 'prenom' => 'Jules',
+            'email' => 'jules@example.com', 'password' => 'Password123',
+            'role' => 'acheteur',
+        ])->assertStatus(201)->assertJsonPath('user.role', 'client');
+    }
+
+    public function test_le_role_vendeur_est_conserve_a_l_inscription(): void
+    {
+        $this->postJson('/api/auth/register', [
+            'nom' => 'Martin', 'prenom' => 'Paul',
+            'email' => 'paul@example.com', 'password' => 'Password123',
+            'role' => 'vendeur',
+        ])->assertStatus(201)->assertJsonPath('user.role', 'vendeur');
+    }
+
     public function test_email_deja_utilise_renvoie_409(): void
     {
         $this->creerUtilisateur('client', ['email' => 'occupe@example.com']);

@@ -107,17 +107,14 @@ class CommandeTest extends TestCase
 
         // Le passage a « livree » horodate la livraison, base du J+14.
         //
-        // Relu avec le compte de l'acheteur : un vendeur peut changer le
-        // statut d'une commande mais ne peut pas en consulter le detail,
-        // reserve au proprietaire et a l'administrateur. Ce cloisonnement
-        // est herite de l'ancien back-end — voir la note dans
-        // docs/ECARTS-CONTRAT.md.
+        // Relu avec le compte de l'acheteur.
         $this->assertNotNull(
             $this->getJson("/api/orders/{$id}", $this->entetes($client))->json('data.date_livraison')
         );
 
-        // Et le vendeur se voit bien refuser la lecture.
-        $this->getJson("/api/orders/{$id}", $this->entetes($vendeur))->assertStatus(403);
+        // Le vendeur concerne peut desormais lire la commande : il doit
+        // savoir quoi preparer.
+        $this->getJson("/api/orders/{$id}", $this->entetes($vendeur))->assertStatus(200);
     }
 
     public function test_une_commande_expediee_n_est_plus_annulable(): void
@@ -151,27 +148,232 @@ class CommandeTest extends TestCase
         $this->assertSame(10, Produit::query()->find($produit->id)->stock);
     }
 
-    public function test_seul_un_acheteur_peut_deposer_un_avis(): void
+    // ------------------------------------------------------------------
+    // Separation des roles
+    // ------------------------------------------------------------------
+
+    public function test_un_vendeur_ne_peut_pas_passer_commande(): void
+    {
+        $vendeur = $this->creerUtilisateur('vendeur');
+        $produit = $this->creerProduit($this->creerBoutique($this->creerUtilisateur('vendeur')));
+
+        // Le refus qui fait foi est ici : masquer le panier cote interface
+        // ne protege rien, l'API restant appelable directement.
+        $this->postJson('/api/orders', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+        ], $this->entetes($vendeur))->assertStatus(403);
+
+        $this->assertDatabaseCount('commandes', 0);
+    }
+
+    public function test_un_acheteur_ne_peut_pas_ouvrir_de_boutique(): void
+    {
+        $client = $this->creerUtilisateur('client');
+
+        $this->postJson('/api/boutiques', ['nom' => 'Ma tentative'], $this->entetes($client))
+            ->assertStatus(403)
+            ->assertJsonPath('error', 'Seul un compte vendeur peut ouvrir une boutique.');
+
+        // Et le role n'a pas ete promu au passage : il se choisit a
+        // l'inscription et n'evolue plus.
+        $this->assertSame('client', $client->fresh()->role);
+        $this->assertDatabaseCount('boutiques', 0);
+    }
+
+    public function test_le_resume_de_l_acheteur_porte_ses_lignes(): void
     {
         $client  = $this->creerUtilisateur('client');
         $produit = $this->creerProduit($this->creerBoutique($this->creerUtilisateur('vendeur')));
 
-        $this->postJson("/api/products/{$produit->id}/avis", [
-            'note' => 5, 'commentaire' => 'Sans avoir achete',
-        ], $this->entetes($client))->assertStatus(403);
+        $this->postJson('/api/orders', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 2]],
+        ], $this->entetes($client));
+
+        // Sans ces lignes, l'historique ne permet pas de remonter a la
+        // fiche produit — donc de deposer un avis apres livraison.
+        $reponse = $this->getJson('/api/orders', $this->entetes($client));
+
+        $reponse->assertStatus(200)
+            ->assertJsonPath('data.0.lignes.0.produit_id', (int) $produit->id)
+            ->assertJsonPath('data.0.lignes.0.quantite', 2);
+
+        $this->assertNotNull($reponse->json('data.0.lignes.0.produit_slug'));
+    }
+
+    // ------------------------------------------------------------------
+    // Vue « ventes » du vendeur
+    // ------------------------------------------------------------------
+
+    public function test_le_vendeur_voit_les_commandes_contenant_ses_produits(): void
+    {
+        $client  = $this->creerUtilisateur('client');
+        $vendeur = $this->creerUtilisateur('vendeur');
+        $produit = $this->creerProduit($this->creerBoutique($vendeur));
+
+        $this->postJson('/api/orders', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+        ], $this->entetes($client))->assertStatus(201);
+
+        // Sans scope : ses propres achats, donc rien.
+        $this->assertCount(0, $this->getJson('/api/orders', $this->entetes($vendeur))->json('data'));
+
+        // Avec scope=ventes : la commande de son client.
+        $ventes = $this->getJson('/api/orders?scope=ventes', $this->entetes($vendeur));
+
+        $ventes->assertStatus(200);
+        $this->assertCount(1, $ventes->json('data'));
+
+        // Le nom du client accompagne la vente : le vendeur doit savoir a
+        // qui expedier.
+        $this->assertSame($client->nom, $ventes->json('data.0.client_nom'));
+    }
+
+    public function test_un_vendeur_ne_voit_pas_les_ventes_d_un_autre(): void
+    {
+        $client   = $this->creerUtilisateur('client');
+        $vendeurA = $this->creerUtilisateur('vendeur');
+        $vendeurB = $this->creerUtilisateur('vendeur');
+        $this->creerBoutique($vendeurB);
+
+        $produit = $this->creerProduit($this->creerBoutique($vendeurA));
 
         $this->postJson('/api/orders', [
             'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
         ], $this->entetes($client));
 
-        $this->postJson("/api/products/{$produit->id}/avis", [
-            'note' => 5, 'titre' => 'Superbe', 'commentaire' => 'Tres bien fini.',
-        ], $this->entetes($client))->assertStatus(201)->assertJsonPath('data.est_verifie', 1);
+        $this->assertCount(
+            0,
+            $this->getJson('/api/orders?scope=ventes', $this->entetes($vendeurB))->json('data')
+        );
+    }
+
+    public function test_un_client_ne_peut_pas_demander_la_vue_ventes(): void
+    {
+        $client = $this->creerUtilisateur('client');
+
+        $this->getJson('/api/orders?scope=ventes', $this->entetes($client))
+            ->assertStatus(403);
+    }
+
+    public function test_la_liste_de_l_acheteur_n_expose_pas_le_nom_du_client(): void
+    {
+        $client  = $this->creerUtilisateur('client');
+        $produit = $this->creerProduit($this->creerBoutique($this->creerUtilisateur('vendeur')));
+
+        $this->postJson('/api/orders', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+        ], $this->entetes($client));
+
+        // Inutile sur sa propre liste : la donnee ne sort que si elle sert.
+        $this->getJson('/api/orders', $this->entetes($client))
+            ->assertStatus(200)
+            ->assertJsonMissingPath('data.0.client_nom');
+    }
+
+    public function test_un_vendeur_ne_change_pas_le_statut_d_une_commande_qui_ne_le_concerne_pas(): void
+    {
+        $client   = $this->creerUtilisateur('client');
+        $vendeurA = $this->creerUtilisateur('vendeur');
+        $intrus   = $this->creerUtilisateur('vendeur');
+        $this->creerBoutique($intrus);
+
+        $produit = $this->creerProduit($this->creerBoutique($vendeurA));
+
+        $id = $this->postJson('/api/orders', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+        ], $this->entetes($client))->json('data.id');
+
+        // Le middleware ne verifie que le role : sans controle de propriete,
+        // n'importe quel vendeur marquerait « livree » la commande d'autrui.
+        $this->putJson("/api/orders/{$id}/status", ['statut' => 'livree'], $this->entetes($intrus))
+            ->assertStatus(403);
+
+        $this->putJson("/api/orders/{$id}/status", ['statut' => 'livree'], $this->entetes($vendeurA))
+            ->assertStatus(200);
+    }
+
+    public function test_l_avis_exige_un_achat_puis_une_livraison(): void
+    {
+        $client  = $this->creerUtilisateur('client');
+        $vendeur = $this->creerUtilisateur('vendeur');
+        $produit = $this->creerProduit($this->creerBoutique($vendeur));
+
+        $avis = ['note' => 5, 'titre' => 'Superbe', 'commentaire' => 'Tres bien fini.'];
+
+        // 1. Jamais commande.
+        $this->postJson("/api/products/{$produit->id}/avis", $avis, $this->entetes($client))
+            ->assertStatus(403);
+
+        $id = $this->postJson('/api/orders', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+        ], $this->entetes($client))->json('data.id');
+
+        // 2. Commande passee mais pas encore livree : on ne note pas un
+        // produit qu'on n'a pas recu.
+        $this->postJson("/api/products/{$produit->id}/avis", $avis, $this->entetes($client))
+            ->assertStatus(403);
+
+        $this->putJson("/api/orders/{$id}/status", ['statut' => 'livree'], $this->entetes($vendeur))
+            ->assertStatus(200);
+
+        // 3. Livree : l'avis passe.
+        $this->postJson("/api/products/{$produit->id}/avis", $avis, $this->entetes($client))
+            ->assertStatus(201)
+            ->assertJsonPath('data.est_verifie', 1);
 
         // Un seul avis par couple (produit, utilisateur).
+        $this->postJson("/api/products/{$produit->id}/avis", ['note' => 4], $this->entetes($client))
+            ->assertStatus(409);
+    }
+
+    public function test_l_eligibilite_annonce_le_motif_avant_toute_saisie(): void
+    {
+        $client  = $this->creerUtilisateur('client');
+        $vendeur = $this->creerUtilisateur('vendeur');
+        $produit = $this->creerProduit($this->creerBoutique($vendeur));
+
+        $url = "/api/products/{$produit->id}/avis/eligibilite";
+
+        // Jamais commande.
+        $this->getJson($url, $this->entetes($client))
+            ->assertStatus(200)
+            ->assertJsonPath('data.peut_deposer', false)
+            ->assertJsonPath('data.motif', 'non_commande');
+
+        $id = $this->postJson('/api/orders', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+        ], $this->entetes($client))->json('data.id');
+
+        // Commande, pas livree.
+        $this->getJson($url, $this->entetes($client))
+            ->assertJsonPath('data.peut_deposer', false)
+            ->assertJsonPath('data.motif', 'non_livre');
+
+        $this->putJson("/api/orders/{$id}/status", ['statut' => 'livree'], $this->entetes($vendeur));
+
+        // Livree.
+        $this->getJson($url, $this->entetes($client))
+            ->assertJsonPath('data.peut_deposer', true)
+            ->assertJsonPath('data.motif', 'ok');
+
         $this->postJson("/api/products/{$produit->id}/avis", [
-            'note' => 4,
-        ], $this->entetes($client))->assertStatus(409);
+            'note' => 5, 'commentaire' => 'Parfait.',
+        ], $this->entetes($client))->assertStatus(201);
+
+        // Deja depose.
+        $this->getJson($url, $this->entetes($client))
+            ->assertJsonPath('data.peut_deposer', false)
+            ->assertJsonPath('data.motif', 'deja_depose');
+    }
+
+    public function test_un_vendeur_ne_depose_pas_d_avis(): void
+    {
+        $vendeur = $this->creerUtilisateur('vendeur');
+        $produit = $this->creerProduit($this->creerBoutique($vendeur));
+
+        $this->getJson("/api/products/{$produit->id}/avis/eligibilite", $this->entetes($vendeur))
+            ->assertJsonPath('data.peut_deposer', false)
+            ->assertJsonPath('data.motif', 'vendeur');
     }
 
     public function test_la_liste_des_avis_porte_la_cle_stats(): void

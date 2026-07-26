@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, Store, Star } from 'lucide-react';
 import { CartContext } from '../contexts/CartContext';
+import { useAuth } from '../hooks/useAuth';
 import StarRating from './StarRating';
 import { parseImages } from '../utils/parseImages';
 
@@ -16,6 +17,9 @@ const PLACEHOLDER_IMG =
  */
 export default function ProductCard({ product, compact = false }) {
   const { addItem } = useContext(CartContext);
+  // Un compte vendeur n'achète pas : le bouton d'ajout au panier disparaît.
+  // Le refus qui fait foi reste côté serveur, sur POST /orders.
+  const { isVendeur } = useAuth();
 
   const {
     id,
@@ -128,7 +132,7 @@ export default function ProductCard({ product, compact = false }) {
           <span className={`font-bold text-primary ${compact ? 'text-lg' : 'text-xl'}`}>
             {Number(prix).toFixed(2)} €
           </span>
-          {!compact && (
+          {!compact && !isVendeur && (
             <button
               onClick={handleAddToCart}
               disabled={!inStock}

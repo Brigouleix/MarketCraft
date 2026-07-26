@@ -117,6 +117,20 @@ class BoutiqueController extends Controller
 
         $user = $request->user();
 
+        // Regle metier : seul un compte vendeur ouvre une boutique. Le role
+        // se choisit a l'inscription et n'evolue plus — un acheteur qui
+        // voudrait vendre cree un compte vendeur.
+        //
+        // La promotion automatique client -> vendeur qui existait ici a ete
+        // retiree : elle contredisait la separation des roles, et faisait
+        // perdre a l'utilisateur la possibilite d'acheter sans qu'il l'ait
+        // demande.
+        if (! $user->aLeRole('vendeur', 'admin')) {
+            return $this->interdit(
+                'Seul un compte vendeur peut ouvrir une boutique.'
+            );
+        }
+
         // Regle de gestion : au plus une boutique par vendeur. Le controle
         // est double, ici pour le message clair et en base par une cle
         // unique, seule a resister a deux envois simultanes.
@@ -134,14 +148,6 @@ class BoutiqueController extends Controller
                 'banniere_url' => $donnees['banniere_url'] ?? null,
                 'est_active'   => 1,
             ]);
-
-            // Ouvrir une boutique fait de son titulaire un vendeur. Sans
-            // cette promotion, l'utilisateur ne pourrait pas y deposer de
-            // produit : POST /products exige le role vendeur.
-            if ($user->role === 'client') {
-                $user->role = 'vendeur';
-                $user->save();
-            }
 
             return $boutique;
         });

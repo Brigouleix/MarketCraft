@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\AnalyseConcurrentielleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AvisController;
 use App\Http\Controllers\BoutiqueController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RecommandationController;
+use App\Http\Controllers\UploadController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -74,6 +76,10 @@ Route::middleware('jwt')->group(function () {
     Route::delete('/products/{id}', [ProduitController::class, 'destroy'])->whereNumber('id');
 
     Route::post('/products/{id}/avis', [AvisController::class, 'store'])->whereNumber('id');
+
+    // Consultee par la fiche produit avant d'afficher le formulaire d'avis.
+    Route::get('/products/{id}/avis/eligibilite', [AvisController::class, 'eligibilite'])
+        ->whereNumber('id');
 });
 
 // =========================================================================
@@ -81,6 +87,19 @@ Route::middleware('jwt')->group(function () {
 // =========================================================================
 
 Route::post('/cart/recommendations', [RecommandationController::class, 'pourPanier']);
+
+// Suggestions fondees sur l'historique d'achat du client connecte.
+Route::get('/me/recommendations', [RecommandationController::class, 'pourHistorique'])
+    ->middleware('jwt');
+
+// =========================================================================
+// TABLEAU DE BORD VENDEUR
+// =========================================================================
+
+// Analyse concurrentielle — ajout hors perimetre du cahier des charges,
+// documente comme tel dans docs/ECARTS-CONTRAT.md.
+Route::get('/dashboard/concurrence', AnalyseConcurrentielleController::class)
+    ->middleware(['jwt', 'role:vendeur,admin']);
 
 // =========================================================================
 // BOUTIQUES
@@ -120,6 +139,15 @@ Route::middleware('jwt')->group(function () {
 Route::delete('/avis/{id}', [AvisController::class, 'destroy'])
     ->whereNumber('id')
     ->middleware('jwt');
+
+// =========================================================================
+// DEPOT D'IMAGES
+// =========================================================================
+
+Route::middleware('jwt')->group(function () {
+    Route::post('/upload/image', [UploadController::class, 'image']);
+    Route::post('/upload/images', [UploadController::class, 'images']);
+});
 
 // =========================================================================
 // CATEGORIES

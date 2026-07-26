@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ShoppingCart, Store, ChevronLeft, ChevronRight, Plus, Minus,
-  Package, Truck, RotateCcw, Star,
+  Package, Truck, RotateCcw, Star, Lock, CheckCircle2,
 } from 'lucide-react';
 import { productsAPI, avisAPI } from '../services/api';
 import { CartContext } from '../contexts/CartContext';
@@ -105,6 +105,67 @@ function AvisForm({ productId, onSuccess }) {
         {isPending ? 'Publication…' : 'Publier mon avis'}
       </button>
     </form>
+  );
+}
+
+/**
+ * Décide d'afficher ou non le formulaire d'avis.
+ *
+ * L'autorisation vient du serveur — même méthode que celle appliquée à
+ * l'écriture. La dupliquer ici en inspectant les commandes du client
+ * conduirait tôt ou tard à une divergence : l'interface proposerait un
+ * formulaire que l'API refuse, ou l'inverse.
+ */
+function ZoneAvis({ productId }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['avis-eligibilite', productId],
+    queryFn: async () => {
+      const { data } = await avisAPI.eligibilite(productId);
+      return data?.data ?? data;
+    },
+    retry: false,
+    staleTime: 1000 * 60,
+  });
+
+  if (isLoading) {
+    return <div className="card p-5 h-32 animate-pulse bg-secondary-100" />;
+  }
+
+  if (data?.peut_deposer) {
+    return <AvisForm productId={productId} />;
+  }
+
+  // Un avis déjà déposé n'appelle aucun encart : la contribution figure
+  // dans la liste juste en dessous.
+  if (data?.motif === 'deja_depose') {
+    return (
+      <div className="card p-4 flex items-center gap-3 bg-secondary-50">
+        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+        <p className="text-sm text-gray-600">{data.message}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-5 text-center">
+      <Lock className="mx-auto text-secondary-400 mb-2" size={26} />
+      <p className="text-gray-600 text-sm">
+        {data?.message || "Vous ne pouvez pas déposer d'avis sur ce produit."}
+      </p>
+
+      {data?.motif === 'non_livre' && (
+        <Link to="/profil" className="btn-secondary text-sm mt-3 inline-block">
+          Suivre ma commande
+        </Link>
+      )}
+
+      {data?.motif === 'non_commande' && (
+        <p className="text-xs text-gray-400 mt-2">
+          Seuls les acheteurs livrés peuvent donner leur avis — c'est ce qui
+          rend les notes fiables.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -356,9 +417,12 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Review form */}
+          {/* Dépôt d'avis — le formulaire n'apparaît que si le serveur
+              l'autorise. Faire saisir une note puis répondre « non » après
+              coup est une faute d'ergonomie : la réponse était connue avant
+              la première frappe. */}
           {isAuthenticated ? (
-            <AvisForm productId={id} />
+            <ZoneAvis productId={id} />
           ) : (
             <div className="card p-5 text-center">
               <Star className="mx-auto text-amber-400 mb-2" size={28} fill="currentColor" />

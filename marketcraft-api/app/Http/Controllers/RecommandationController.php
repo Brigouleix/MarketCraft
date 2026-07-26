@@ -88,6 +88,27 @@ class RecommandationController extends Controller
     }
 
     // ------------------------------------------------------------------
+    // GET /me/recommendations
+    // ------------------------------------------------------------------
+
+    /**
+     * Suggestions fondees sur l'historique d'achat du client connecte.
+     *
+     * Repond a la partie « personnalisee » de l'option C : les
+     * recommandations different d'un client a l'autre parce qu'elles
+     * partent de ce qu'il a reellement commande.
+     */
+    public function pourHistorique(Request $request): JsonResponse
+    {
+        $resultat = $this->service->pourHistorique(
+            (int) $request->user()->id,
+            $this->limite($request)
+        );
+
+        return $this->ok($this->formater($resultat));
+    }
+
+    // ------------------------------------------------------------------
     // Aides
     // ------------------------------------------------------------------
 

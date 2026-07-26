@@ -177,10 +177,48 @@ le brief documente `/recommendations`.
    `ia_active` passe à `false`, le front l'affiche en badge, et le motif de
    l'échec part dans `storage/logs/ia.log`. Jamais de retour muet.
 
+`GET /me/recommendations` applique la même mécanique à l'historique d'achat
+du client : les articles déjà commandés servent de référence, et sont exclus
+des suggestions — proposer à quelqu'un ce qu'il possède déjà est le défaut
+le plus visible d'un moteur de recommandation.
+
 Fournisseur au format OpenAI, configuré par `AI_API_KEY`, `AI_MODEL`,
 `AI_API_URL` — changer de fournisseur ne touche pas au code.
 `User-Agent` est obligatoire : sans lui, Cloudflare renvoie 403 avant même
 de lire la clé.
+
+---
+
+## Analyse concurrentielle — hors périmètre du CDC
+
+`GET /dashboard/concurrence`
+
+Situe chaque produit d'un vendeur face aux produits comparables des autres
+boutiques : médiane du marché, écart en pourcentage, positionnement.
+
+**Ajout délibéré, hors des trois options du cahier des charges.** Voir
+`docs/ECARTS-CONTRAT.md` §5.10 avant d'en parler en soutenance.
+
+Règle de conception : **les chiffres sont calculés, jamais générés**. Le
+modèle ne voit que des statistiques établies par le serveur et se contente
+de les commenter. Le positionnement se mesure contre la médiane, pas la
+moyenne — une pièce d'exception isolée fausserait tout le reste. Sans clé
+IA, les statistiques et une synthèse rédigée sans modèle restent affichées.
+
+---
+
+## Catalogue de démonstration
+
+`database/sql/004_catalogue_demo.sql` — à importer depuis phpMyAdmin.
+
+Deux artisans, leurs boutiques et seize produits. Les gammes de prix se
+chevauchent délibérément — quatre tables en bois entre 149 et 320 €, quatre
+luminaires entre 42 et 95 € — parce que sans distribution, il n'y a ni
+similarité à mesurer ni positionnement à calculer.
+
+Le script est rejouable : chaque insertion s'appuie sur une clé unique
+existante, aucun doublon n'est créé et aucune donnée existante n'est
+écrasée. Mot de passe des comptes ajoutés : `Password123`.
 
 ---
 

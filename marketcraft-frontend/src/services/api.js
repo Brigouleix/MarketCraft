@@ -133,6 +133,10 @@ export const categoriesAPI = {
 export const avisAPI = {
   getByProduct: (productId, params) => api.get(`/products/${productId}/avis`, { params }),
   create: (productId, data) => api.post(`/products/${productId}/avis`, data),
+  // Le droit de déposer un avis est décidé par le serveur, pas déduit côté
+  // client : la règle est ainsi appliquée au même endroit qu'elle est
+  // vérifiée à l'écriture.
+  eligibilite: (productId) => api.get(`/products/${productId}/avis/eligibilite`),
   delete: (productId, avisId) => api.delete(`/products/${productId}/avis/${avisId}`),
 };
 
@@ -173,6 +177,25 @@ export const adminAPI = {
   // force=1 confirme la suppression malgré des produits rattachés
   deleteCategorie: (id, force = false) =>
     api.delete(`/admin/categories/${id}${force ? '?force=1' : ''}`),
+};
+
+// ── Recommandations IA ────────────────────────────────────────────────────────
+// Module « recommandation personnalisée » du cahier des charges (option C).
+// Chaque réponse porte `ia_active` : false signale un repli par similarité,
+// que l'interface affiche sous forme de badge.
+export const recommandationsAPI = {
+  // Produits similaires ou complémentaires à une fiche consultée.
+  parProduit:    (id, limit = 4) => api.get(`/products/${id}/recommendations`, { params: { limit } }),
+  // À partir du contenu du panier.
+  parPanier:     (produitIds, limit = 4) => api.post('/cart/recommendations', { produit_ids: produitIds }, { params: { limit } }),
+  // À partir de l'historique d'achat du client connecté.
+  parHistorique: (limit = 4) => api.get('/me/recommendations', { params: { limit } }),
+};
+
+// ── Analyse concurrentielle (tableau de bord vendeur) ─────────────────────────
+// Ajout hors périmètre du cahier des charges, assumé comme tel.
+export const concurrenceAPI = {
+  get: () => api.get('/dashboard/concurrence'),
 };
 
 // ── AI Search ─────────────────────────────────────────────────────────────────

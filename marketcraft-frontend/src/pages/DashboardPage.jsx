@@ -8,6 +8,7 @@ import {
 import { productsAPI, ordersAPI, boutiquesAPI, dashboardAPI, uploadAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useCategories } from '../hooks/useCategories';
+import AnalyseConcurrence from '../components/AnalyseConcurrence';
 import toast from 'react-hot-toast';
 
 const TABS = [
@@ -15,6 +16,9 @@ const TABS = [
   { key: 'products',  label: 'Mes produits',   icon: Package    },
   { key: 'orders',    label: 'Mes commandes',  icon: ShoppingBag},
   { key: 'boutique',  label: 'Ma boutique',    icon: Store      },
+  // Ajout hors perimetre du cahier des charges, assume comme tel :
+  // le module IA impose est la recommandation personnalisee.
+  { key: 'concurrence', label: 'Analyse concurrence', icon: TrendingUp },
 ];
 
 const STATUS_CONFIG = {
@@ -383,10 +387,13 @@ export default function DashboardPage() {
     retry: 1,
   });
 
+  // scope=ventes : les commandes CONTENANT les produits du vendeur, et non
+  // celles qu'il a lui-même passées. Sans ce paramètre, l'onglet reste vide
+  // — un vendeur n'achète pas ses propres articles.
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ['my-orders'],
+    queryKey: ['vendor-orders'],
     queryFn: async () => {
-      const { data } = await ordersAPI.getAll();
+      const { data } = await ordersAPI.getAll({ scope: 'ventes' });
       return data.data ?? data.orders ?? data;
     },
     staleTime: 1000 * 60 * 2,
@@ -730,6 +737,24 @@ export default function DashboardPage() {
               {saveBoutiqueMutation.isPending ? 'Sauvegarde…' : 'Enregistrer les modifications'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Onglet : analyse concurrentielle ─────────────────────────────
+          Les chiffres viennent du serveur ; le modele de langage ne redige
+          que la synthese et les conseils. Monte uniquement a l'ouverture de
+          l'onglet, pour ne pas declencher un appel au fournisseur IA a
+          chaque visite du tableau de bord. */}
+      {activeTab === 'concurrence' && (
+        <div>
+          <h2 className="font-serif font-bold text-xl text-gray-800 mb-1">
+            Analyse concurrentielle
+          </h2>
+          <p className="text-sm text-gray-500 mb-5">
+            Comment vos produits se situent face aux autres artisans de la plateforme.
+          </p>
+
+          <AnalyseConcurrence />
         </div>
       )}
     </div>

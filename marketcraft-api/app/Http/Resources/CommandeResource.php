@@ -68,11 +68,37 @@ final class CommandeResource
      *
      * @return array<string, mixed>
      */
-    public static function resume(Commande $commande): array
-    {
+    public static function resume(
+        Commande $commande,
+        bool $avecClient = false,
+        bool $avecLignes = false,
+    ): array {
         $donnees = self::base($commande);
 
         $donnees['nb_articles'] = (int) ($commande->nb_articles ?? 0);
+
+        // Forme allegee des lignes : de quoi construire un lien vers la
+        // fiche produit, rien de plus. Le detail complet reste sur
+        // GET /orders/:id.
+        if ($avecLignes && $commande->relationLoaded('lignes')) {
+            $donnees['lignes'] = $commande->lignes->map(static fn ($ligne) => [
+                'produit_id'     => (int) $ligne->produit_id,
+                'nom_produit'    => $ligne->nom_produit,
+                'quantite'       => (int) $ligne->quantite,
+                'produit_slug'   => $ligne->relationLoaded('produit') ? $ligne->produit?->slug : null,
+                'produit_images' => $ligne->relationLoaded('produit') ? $ligne->produit?->images : null,
+            ])->values()->all();
+        }
+
+        // Le nom du client n'est expose que sur la vue « ventes » d'un
+        // vendeur, qui a besoin de savoir a qui expedier. La liste des
+        // commandes d'un acheteur n'a aucune raison de le porter.
+        if ($avecClient) {
+            $acheteur = $commande->relationLoaded('utilisateur') ? $commande->utilisateur : null;
+
+            $donnees['client_nom']    = $acheteur?->nom;
+            $donnees['client_prenom'] = $acheteur?->prenom;
+        }
 
         return $donnees;
     }
