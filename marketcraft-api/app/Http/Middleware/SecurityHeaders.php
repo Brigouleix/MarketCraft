@@ -29,7 +29,21 @@ class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
         // L'API ne sert aucun document : tout contenu actif est interdit.
-        $response->headers->set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+        // Exception : la page de documentation `/api/docs` a besoin de charger
+        // Swagger UI depuis un CDN. La CSP y est donc élargie, uniquement sur
+        // ce chemin, à jsdelivr + inline pour le script d'initialisation.
+        if ($request->is('api/docs', 'api/docs/*')) {
+            $response->headers->set('Content-Security-Policy',
+                "default-src 'self'; "
+                . "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                . "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                . "img-src 'self' data: https://cdn.jsdelivr.net; "
+                . "font-src 'self' data: https://cdn.jsdelivr.net; "
+                . "connect-src 'self'"
+            );
+        } else {
+            $response->headers->set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+        }
 
         // Aucune API navigateur n'est requise.
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');

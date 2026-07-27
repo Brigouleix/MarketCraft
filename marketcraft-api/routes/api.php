@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnalyseConcurrentielleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AvisController;
 use App\Http\Controllers\BoutiqueController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CommandeController;
+use App\Http\Controllers\DocsController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RecommandationController;
@@ -37,6 +39,13 @@ use Illuminate\Support\Facades\Route;
 // =========================================================================
 
 Route::get('/health', HealthController::class);
+
+// =========================================================================
+// DOCUMENTATION (Swagger UI + spécification OpenAPI)
+// =========================================================================
+
+Route::get('/docs', [DocsController::class, 'page']);
+Route::get('/docs/openapi.yaml', [DocsController::class, 'spec']);
 
 // =========================================================================
 // AUTHENTIFICATION
@@ -154,3 +163,25 @@ Route::middleware('jwt')->group(function () {
 // =========================================================================
 
 Route::get('/categories', [CategorieController::class, 'index']);
+
+// =========================================================================
+// ADMINISTRATION  (back-office React AdminPage — role:admin)
+// =========================================================================
+
+Route::prefix('admin')->middleware(['jwt', 'role:admin'])->group(function () {
+    Route::get('/stats', [AdminController::class, 'stats']);
+
+    Route::get('/users', [AdminController::class, 'users']);
+    Route::put('/users/{id}/toggle', [AdminController::class, 'toggleUser'])->whereNumber('id');
+
+    Route::get('/boutiques', [AdminController::class, 'boutiques']);
+    Route::put('/boutiques/{id}/toggle', [AdminController::class, 'toggleBoutique'])->whereNumber('id');
+
+    Route::get('/avis', [AdminController::class, 'avis']);
+    Route::delete('/avis/{id}', [AdminController::class, 'deleteAvis'])->whereNumber('id');
+
+    Route::get('/categories', [AdminController::class, 'categories']);
+    Route::post('/categories', [AdminController::class, 'createCategorie']);
+    Route::put('/categories/{id}', [AdminController::class, 'updateCategorie'])->whereNumber('id');
+    Route::delete('/categories/{id}', [AdminController::class, 'deleteCategorie'])->whereNumber('id');
+});
