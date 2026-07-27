@@ -23,6 +23,7 @@ const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
 const LegalNoticePage = lazy(() => import('./pages/LegalNoticePage'));
+const TermsOfUsePage = lazy(() => import('./pages/TermsOfUsePage'));
 
 function PageLoader() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/confidentialite" element={<PrivacyPolicyPage />} />
             <Route path="/cookies" element={<CookiePolicyPage />} />
             <Route path="/mentions-legales" element={<LegalNoticePage />} />
+            <Route path="/conditions-utilisation" element={<TermsOfUsePage />} />
 
             {/* Protected routes */}
             <Route

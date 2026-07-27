@@ -1,8 +1,9 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { MapPin, CheckCircle, ShoppingBag, ArrowLeft, CreditCard, Lock } from 'lucide-react';
 import { CartContext } from '../contexts/CartContext';
+import { useAuth } from '../hooks/useAuth';
 import { ordersAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -50,7 +51,50 @@ function InputField({ label, id, error, required, ...props }) {
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useContext(CartContext);
+  const { user } = useAuth();
   const [form, setForm] = useState(INITIAL_FORM);
+
+  // Pré-remplit les informations déjà connues du compte (prénom, nom, email)
+  // sans écraser ce que l'utilisateur aurait déjà saisi.
+  useEffect(() => {
+    if (!user) return;
+    setForm((prev) => ({
+      ...prev,
+      prenom: prev.prenom || user.prenom || '',
+      nom: prev.nom || user.nom || '',
+      email: prev.email || user.email || '',
+    }));
+  }, [user]);
+
+  // Réutilise l'adresse de la dernière commande : le compte ne stocke pas
+  // d'adresse, mais la plus récente commande en porte une. On ne remplit que
+  // les champs encore vides, pour ne pas écraser une saisie en cours.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      try {
+        const res = await ordersAPI.getAll();
+        const commandes = res.data?.data ?? res.data ?? [];
+        const derniere = [...commandes]
+          .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+          .find((c) => c.addr_ligne1);
+        if (!derniere || annule) return;
+        setForm((prev) => ({
+          ...prev,
+          adresse: prev.adresse || derniere.addr_ligne1 || '',
+          complement: prev.complement || derniere.addr_ligne2 || '',
+          ville: prev.ville || derniere.addr_ville || '',
+          code_postal: prev.code_postal || derniere.addr_code_postal || '',
+          // `pays` a une valeur par défaut : on ne la remplace que si elle
+          // n'a pas été modifiée par l'utilisateur.
+          pays: prev.pays === 'France' ? (derniere.addr_pays || prev.pays) : prev.pays,
+        }));
+      } catch {
+        // Silencieux : si les commandes ne chargent pas, les champs restent vides.
+      }
+    })();
+    return () => { annule = true; };
+  }, [user]);
   const [payment, setPayment] = useState(INITIAL_PAYMENT);
   const [errors, setErrors] = useState({});
   const [confirmed, setConfirmed] = useState(false);

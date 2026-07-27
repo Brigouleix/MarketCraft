@@ -138,6 +138,9 @@ export default function Footer() {
             <Link to="/confidentialite" className="hover:text-white transition-colors">
               Politique de confidentialité
             </Link>
+            <Link to="/conditions-utilisation" className="hover:text-white transition-colors">
+              Conditions d'utilisation
+            </Link>
             <Link to="/mentions-legales" className="hover:text-white transition-colors">
               Mentions légales
             </Link>

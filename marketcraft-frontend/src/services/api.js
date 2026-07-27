@@ -89,6 +89,8 @@ api.interceptors.response.use(
 export const authAPI = {
   login:        (credentials) => api.post('/auth/login', credentials),
   register:     (userData)    => api.post('/auth/register', userData),
+  // Défi captcha, exigé par le serveur au-delà de 3 échecs de connexion.
+  captcha:      ()            => api.get('/auth/captcha'),
   me:           ()            => api.get('/auth/me'),
   updateMe:     (data)        => api.put('/auth/me', data),
   deleteMe:     (data)        => api.delete('/auth/me', { data }),

@@ -4,7 +4,7 @@ import LegalLayout, { LegalSection } from '../components/LegalLayout';
 
 export default function CookiePolicyPage() {
   return (
-    <LegalLayout title="Politique de cookies" updated="[à compléter — ex. 22/07/2026]">
+    <LegalLayout title="Politique de cookies" updated="27/07/2026">
       <p>
         Cette page explique quels cookies et technologies de stockage similaires sont utilisés sur
         MarketCraft, à quoi ils servent, et comment vous pouvez les gérer.

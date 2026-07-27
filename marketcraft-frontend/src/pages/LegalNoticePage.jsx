@@ -3,7 +3,7 @@ import LegalLayout, { LegalSection } from '../components/LegalLayout';
 
 export default function LegalNoticePage() {
   return (
-    <LegalLayout title="Mentions légales" updated="[à compléter — ex. 22/07/2026]">
+    <LegalLayout title="Mentions légales" updated="27/07/2026">
       <p>
         Conformément à la loi n° 2004-575 du 21 juin 2004 pour la confiance dans l'économie
         numérique, les informations suivantes sont portées à la connaissance des utilisateurs du
@@ -12,27 +12,32 @@ export default function LegalNoticePage() {
 
       <LegalSection title="Éditeur du site">
         <p>
-          <strong>[Raison sociale / nom de l'éditeur à compléter]</strong>
+          <strong>MarketCraft</strong>
           <br />
-          [Statut juridique et capital le cas échéant]
+          SAS au capital de 1&nbsp;000&nbsp;€ (projet de démonstration)
           <br />
-          Adresse&nbsp;: [adresse postale à compléter]
+          Adresse&nbsp;: 12 rue des Artisans, 75011 Paris, France
           <br />
-          SIRET&nbsp;: [numéro à compléter] — TVA intracommunautaire&nbsp;: [le cas échéant]
+          SIRET&nbsp;: 000&nbsp;000&nbsp;000&nbsp;00000 (numéro fictif) — TVA intracommunautaire&nbsp;: non applicable
           <br />
-          E-mail&nbsp;: [email de contact à compléter]
+          E-mail&nbsp;: contact@marketcraft.fr
+        </p>
+        <p className="text-sm text-gray-500">
+          Informations de démonstration&nbsp;: à remplacer par les mentions réelles de l'éditeur
+          avant toute mise en production.
         </p>
       </LegalSection>
 
       <LegalSection title="Directeur de la publication">
-        <p>[Nom du directeur de la publication à compléter].</p>
+        <p>L'équipe MarketCraft.</p>
       </LegalSection>
 
       <LegalSection title="Hébergement">
         <p>
-          Le site est hébergé par&nbsp;:
+          Le site est hébergé sur&nbsp;:
           <br />
-          <strong>[Nom de l'hébergeur à compléter]</strong>, [adresse de l'hébergeur], [contact].
+          <strong>Environnement de démonstration</strong> (serveur de développement local). En
+          production, l'hébergeur sera précisé ici.
         </p>
       </LegalSection>
 

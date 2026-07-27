@@ -52,17 +52,20 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const login = useCallback(async (email, password) => {
+  // `captcha` est optionnel : { captcha_token, captcha_reponse }, exigé par le
+  // serveur au-delà de 3 échecs. On renvoie `details` pour que la page de
+  // connexion sache afficher le défi (details.captcha_requis).
+  const login = useCallback(async (email, password, captcha) => {
     setLoading(true);
     try {
-      const { data } = await authAPI.login({ email, password });
+      const { data } = await authAPI.login({ email, password, ...(captcha || {}) });
       persistAuth(data.access_token, data.refresh_token, data.user);
       toast.success(`Bienvenue, ${data.user.prenom || data.user.nom} !`);
       return { success: true, user: data.user };
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || 'Email ou mot de passe invalide.';
       toast.error(msg);
-      return { success: false, error: msg };
+      return { success: false, error: msg, details: err.response?.data?.details };
     } finally {
       setLoading(false);
     }

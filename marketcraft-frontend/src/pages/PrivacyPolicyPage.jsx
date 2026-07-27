@@ -4,7 +4,7 @@ import LegalLayout, { LegalSection } from '../components/LegalLayout';
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalLayout title="Politique de confidentialité" updated="[à compléter — ex. 22/07/2026]">
+    <LegalLayout title="Politique de confidentialité" updated="27/07/2026">
       <p>
         La présente politique décrit la manière dont MarketCraft collecte, utilise et protège
         les données personnelles de ses utilisateurs, conformément au Règlement Général sur la
@@ -15,8 +15,8 @@ export default function PrivacyPolicyPage() {
         <p>
           Le responsable du traitement des données est&nbsp;:
           <br />
-          <strong>[Nom de l'éditeur / raison sociale à compléter]</strong>, [statut juridique],
-          [adresse], joignable à l'adresse <strong>[email de contact à compléter]</strong>.
+          <strong>MarketCraft</strong>, éditeur de la plateforme, joignable à l'adresse{' '}
+          <strong>contact@marketcraft.fr</strong>.
         </p>
       </LegalSection>
 
@@ -83,7 +83,7 @@ export default function PrivacyPolicyPage() {
           Vous pouvez exercer une partie de ces droits directement depuis votre{' '}
           <Link to="/profil" className="text-primary hover:underline">espace personnel</Link>&nbsp;:
           modification de vos informations, changement de mot de passe et suppression de votre compte.
-          Pour toute autre demande, contactez-nous à <strong>[email de contact à compléter]</strong>.
+          Pour toute autre demande, contactez-nous à <strong>contact@marketcraft.fr</strong>.
           Vous pouvez également introduire une réclamation auprès de la CNIL (www.cnil.fr).
         </p>
       </LegalSection>
@@ -108,7 +108,7 @@ export default function PrivacyPolicyPage() {
         <p>
           Pour toute question relative à cette politique ou à vos données&nbsp;:
           <br />
-          <strong>[email de contact / DPO à compléter]</strong>.
+          <strong>contact@marketcraft.fr</strong>.
         </p>
       </LegalSection>
     </LegalLayout>

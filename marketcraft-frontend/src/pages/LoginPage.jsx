@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, Hammer } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Hammer, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { authAPI } from '../services/api';
 
 export default function LoginPage() {
   const { login, loading } = useAuth();
@@ -12,6 +13,18 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  // Défi anti-robot, activé par le serveur au-delà de 3 échecs de connexion.
+  const [captcha, setCaptcha] = useState({ required: false, question: '', token: '', answer: '' });
+
+  const chargerCaptcha = async () => {
+    try {
+      const { data } = await authAPI.captcha();
+      const defi = data.data ?? data;
+      setCaptcha({ required: true, question: defi.question, token: defi.token, answer: '' });
+    } catch {
+      // Si le défi ne se charge pas, le message d'erreur de connexion reste affiché.
+    }
+  };
 
   const validate = () => {
     const errs = {};
@@ -29,9 +42,22 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
+    if (captcha.required && !captcha.answer.trim())
+      errs.captcha = 'Veuillez résoudre le calcul de sécurité.';
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    const result = await login(form.email, form.password);
-    if (result.success) navigate(from, { replace: true });
+
+    const captchaPayload = captcha.required
+      ? { captcha_token: captcha.token, captcha_reponse: captcha.answer.trim() }
+      : undefined;
+
+    const result = await login(form.email, form.password, captchaPayload);
+    if (result.success) { navigate(from, { replace: true }); return; }
+
+    // Le serveur exige un captcha (nouveau) ou en exigeait déjà : on (r)affiche
+    // un défi frais pour la tentative suivante.
+    if (result.details?.captcha_requis || captcha.required) {
+      await chargerCaptcha();
+    }
   };
 
   return (
@@ -107,6 +133,47 @@ export default function LoginPage() {
               </div>
               {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
             </div>
+
+            {/* Captcha — affiché seulement quand le serveur l'exige */}
+            {captcha.required && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <label htmlFor="captcha" className="flex items-center gap-1.5 text-sm font-medium text-amber-800 mb-2">
+                  <ShieldCheck size={15} /> Vérification de sécurité <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-2 rounded-lg bg-white border border-amber-300 text-gray-800 font-semibold text-sm whitespace-nowrap">
+                    {captcha.question}
+                  </span>
+                  <input
+                    id="captcha"
+                    name="captcha"
+                    type="text"
+                    inputMode="numeric"
+                    value={captcha.answer}
+                    onChange={(e) => {
+                      const answer = e.target.value;
+                      setCaptcha((c) => ({ ...c, answer }));
+                      if (errors.captcha) setErrors((p) => ({ ...p, captcha: '' }));
+                    }}
+                    placeholder="Réponse"
+                    className={`input-field flex-1 ${errors.captcha ? 'border-red-400 focus:ring-red-200' : ''}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={chargerCaptcha}
+                    className="p-2 text-amber-700 hover:text-amber-900"
+                    title="Générer un nouveau calcul"
+                    aria-label="Générer un nouveau calcul"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+                <p className="text-xs text-amber-700 mt-1.5">
+                  Trop de tentatives : merci de confirmer que vous n'êtes pas un robot.
+                </p>
+                {errors.captcha && <p className="text-red-500 text-xs mt-1">{errors.captcha}</p>}
+              </div>
+            )}
 
             {/* Remember me */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
