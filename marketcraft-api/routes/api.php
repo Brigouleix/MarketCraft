@@ -9,6 +9,7 @@ use App\Http\Controllers\AvisController;
 use App\Http\Controllers\BoutiqueController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CommandeController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProduitController;
@@ -109,6 +110,12 @@ Route::get('/me/recommendations', [RecommandationController::class, 'pourHistori
 // documente comme tel dans docs/ECARTS-CONTRAT.md.
 Route::get('/dashboard/concurrence', AnalyseConcurrentielleController::class)
     ->middleware(['jwt', 'role:vendeur,admin']);
+
+// Indicateurs du vendeur (sa boutique) et statistiques d'achat du client.
+Route::get('/dashboard/stats', [DashboardController::class, 'vendeur'])
+    ->middleware(['jwt', 'role:vendeur,admin']);
+Route::get('/dashboard/acheteur', [DashboardController::class, 'acheteur'])
+    ->middleware('jwt');
 
 // =========================================================================
 // BOUTIQUES
