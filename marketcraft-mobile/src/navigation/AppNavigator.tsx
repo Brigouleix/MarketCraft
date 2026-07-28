@@ -17,6 +17,7 @@ import LoginScreen         from '../screens/LoginScreen';
 import RegisterScreen      from '../screens/RegisterScreen';
 import DashboardScreen     from '../screens/DashboardScreen';
 import BuyerStatsScreen    from '../screens/BuyerStatsScreen';
+import ProfileScreen       from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
@@ -85,6 +86,17 @@ function MainTabs() {
             headerTintColor: colors.primary,
             headerTitleStyle: { fontWeight: '700' },
             headerTitle: 'Mes statistiques',
+          }}
+        />
+      )}
+      {isAuthenticated && (
+        <Tab.Screen
+          name="Compte"
+          component={ProfileScreen}
+          options={{
+            title: 'Compte',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👤</Text>,
+            headerShown: false,
           }}
         />
       )}

@@ -43,14 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    // L'API renvoie access_token / refresh_token (et non « token ») au
+    // premier niveau de la réponse.
     const { data } = await authAPI.login({ email, password });
-    await AsyncStorage.setItem('jwt_token', data.token);
+    await AsyncStorage.setItem('jwt_token', data.access_token);
     setUser(data.user);
   };
 
   const register = async (formData: object) => {
     const { data } = await authAPI.register(formData);
-    await AsyncStorage.setItem('jwt_token', data.token);
+    await AsyncStorage.setItem('jwt_token', data.access_token);
     setUser(data.user);
   };
 
