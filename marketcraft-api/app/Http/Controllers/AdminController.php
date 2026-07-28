@@ -8,6 +8,7 @@ use App\Models\Avis;
 use App\Models\Boutique;
 use App\Models\Categorie;
 use App\Models\Commande;
+use App\Models\JournalActivite;
 use App\Models\Produit;
 use App\Models\User;
 use App\Services\ActivityLogger;
@@ -325,6 +326,47 @@ class AdminController extends Controller
         $this->journal->avertissement('admin_suppression_categorie', "Categorie supprimee : {$categorie->nom}", ['id' => $id]);
 
         return $this->ok(null, 'Categorie supprimee.');
+    }
+
+    // ------------------------------------------------------------------
+    // GET /admin/logs  (journal d'activite, pagine)
+    // ------------------------------------------------------------------
+
+    public function logs(Request $request): JsonResponse
+    {
+        $page  = max(1, (int) $request->query('page', 1));
+        $limit = min(100, max(1, (int) $request->query('limit', 25)));
+
+        $query = JournalActivite::query()
+            ->with('utilisateur:id,prenom,nom')
+            ->orderByDesc('id');
+
+        // Filtre par niveau (info / avertissement / erreur / critique).
+        $niveau = $request->query('niveau');
+        if (is_string($niveau) && in_array($niveau, JournalActivite::NIVEAUX, true)) {
+            $query->where('niveau', $niveau);
+        }
+
+        // Filtre texte sur l'action (ex. « connexion », « admin_ »).
+        $action = $request->query('action');
+        if (is_string($action) && trim($action) !== '') {
+            $query->where('action', 'like', '%' . trim($action) . '%');
+        }
+
+        $total = (clone $query)->count();
+
+        $items = $query->forPage($page, $limit)->get()->map(static fn (JournalActivite $l): array => [
+            'id'          => (int) $l->id,
+            'created_at'  => optional($l->created_at)->format('Y-m-d H:i:s'),
+            'action'      => $l->action,
+            'niveau'      => $l->niveau,
+            'message'     => $l->message,
+            'utilisateur' => $l->utilisateur ? trim("{$l->utilisateur->prenom} {$l->utilisateur->nom}") : null,
+            'ip'          => $l->ip,
+            'contexte'    => $l->contexte,
+        ])->all();
+
+        return $this->pagine($items, $total, $page, $limit);
     }
 
     // ------------------------------------------------------------------

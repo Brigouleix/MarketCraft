@@ -21,11 +21,31 @@ import {
   ShieldAlert,
   MessageSquarePlus,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import { authAPI, ordersAPI, recommandationsAPI } from '../services/api';
 import RecommandationsIA from '../components/RecommandationsIA';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
+
+// Télécharge la facture PDF d'une commande. Le jeton JWT est ajouté par
+// l'intercepteur axios ; on récupère donc le binaire puis on force le
+// téléchargement côté navigateur.
+async function downloadFacture(id) {
+  try {
+    const res = await ordersAPI.facture(id);
+    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `facture-${id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Impossible de télécharger la facture.');
+  }
+}
 
 const STATUS_CONFIG = {
   en_attente: { label: 'En attente', color: 'text-amber-600 bg-amber-100', icon: Clock },
@@ -575,6 +595,7 @@ export default function ProfilePage() {
                     <th className="px-5 py-3.5 font-semibold text-gray-600">Articles</th>
                     <th className="px-5 py-3.5 font-semibold text-gray-600">Total</th>
                     <th className="px-5 py-3.5 font-semibold text-gray-600">Statut</th>
+                    <th className="px-5 py-3.5 font-semibold text-gray-600">Facture</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-secondary-100">
@@ -603,6 +624,15 @@ export default function ProfilePage() {
                           <td className="px-5 py-4">
                             <StatusBadge statut={order.statut} />
                           </td>
+                          <td className="px-5 py-4">
+                            <button
+                              onClick={() => downloadFacture(order.id)}
+                              className="inline-flex items-center gap-1.5 text-primary hover:bg-primary-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                              title="Télécharger la facture PDF"
+                            >
+                              <Download size={14} /> Facture
+                            </button>
+                          </td>
                         </tr>
 
                         {/* Détail des articles : c'est le seul chemin depuis
@@ -612,7 +642,7 @@ export default function ProfilePage() {
                             livraison. */}
                         {lignes.length > 0 && (
                           <tr className="bg-secondary-50/50">
-                            <td colSpan={5} className="px-5 pb-4 pt-0">
+                            <td colSpan={6} className="px-5 pb-4 pt-0">
                               <ul className="space-y-1.5">
                                 {lignes.map((ligne, i) => (
                                   <li

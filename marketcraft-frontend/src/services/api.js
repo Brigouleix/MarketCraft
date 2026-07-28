@@ -114,6 +114,8 @@ export const ordersAPI = {
   getById: (id) => api.get(`/orders/${id}`),
   create: (data) => api.post('/orders', data),
   updateStatus: (id, status) => api.put(`/orders/${id}/status`, { statut: status }),
+  // Facture PDF de la commande (téléchargement binaire).
+  facture: (id) => api.get(`/orders/${id}/facture`, { responseType: 'blob' }),
 };
 
 // ── Boutiques ─────────────────────────────────────────────────────────────────
@@ -171,6 +173,9 @@ export const adminAPI = {
   toggleBoutique:  (id) => api.put(`/admin/boutiques/${id}/toggle`),
   getAvis:         () => api.get('/admin/avis'),
   deleteAvis:      (id) => api.delete(`/admin/avis/${id}`),
+
+  // Journal d'activité (paginé, filtrable par niveau)
+  getLogs:         (params) => api.get('/admin/logs', { params }),
 
   // Catégories
   getCategories:   () => api.get('/admin/categories'),

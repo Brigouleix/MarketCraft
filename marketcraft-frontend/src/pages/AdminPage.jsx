@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  LayoutDashboard, Users, Store, Star, Tags,
+  LayoutDashboard, Users, Store, Star, Tags, ScrollText,
   ShieldCheck, Trash2, UserCheck, UserX, Package,
   Euro, TrendingUp, Plus, Pencil, Check, X,
 } from 'lucide-react';
@@ -16,7 +16,15 @@ const SECTIONS = [
   { key: 'boutiques',  label: 'Boutiques',      icon: Store },
   { key: 'categories', label: 'Catégories',     icon: Tags },
   { key: 'avis',       label: 'Avis',           icon: Star },
+  { key: 'logs',       label: 'Journal',        icon: ScrollText },
 ];
+
+const NIVEAU_BADGE = {
+  info:          'bg-blue-100 text-blue-700',
+  avertissement: 'bg-amber-100 text-amber-700',
+  erreur:        'bg-red-100 text-red-700',
+  critique:      'bg-red-200 text-red-900',
+};
 
 const ROLE_BADGE = {
   admin:   'bg-red-100 text-red-700',
@@ -394,6 +402,95 @@ function CategoriesSection() {
   );
 }
 
+// ── Onglet Journal d'activité ────────────────────────────────────────────────
+const NIVEAUX = [
+  { v: '',              l: 'Tous' },
+  { v: 'info',          l: 'Info' },
+  { v: 'avertissement', l: 'Alerte' },
+  { v: 'erreur',        l: 'Erreur' },
+  { v: 'critique',      l: 'Critique' },
+];
+
+function JournalSection() {
+  const [page, setPage] = useState(1);
+  const [niveau, setNiveau] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-logs', page, niveau],
+    queryFn: async () => (await adminAPI.getLogs({ page, limit: 25, niveau: niveau || undefined })).data,
+  });
+
+  const logs = data?.data ?? [];
+  const pag = data?.pagination ?? { page: 1, total_pages: 1, total: 0 };
+
+  return (
+    <Card title="Journal d'activité" icon={ScrollText} tools={`${pag.total} entrées`} accent="teal">
+      {/* Filtres par niveau */}
+      <div className="flex flex-wrap gap-1.5 px-5 pt-4">
+        {NIVEAUX.map((n) => (
+          <button
+            key={n.v}
+            onClick={() => { setNiveau(n.v); setPage(1); }}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              niveau === n.v ? 'bg-primary text-white border-primary' : 'text-gray-600 border-secondary-300 hover:bg-secondary-100'
+            }`}
+          >
+            {n.l}
+          </button>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto mt-3">
+        {isLoading ? (
+          <p className="text-gray-500 text-sm p-6">Chargement…</p>
+        ) : logs.length === 0 ? (
+          <p className="text-gray-500 text-sm p-6">Aucune entrée dans le journal.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-secondary-50 border-b-2 border-secondary-200">
+              <tr><Th>Date</Th><Th>Niveau</Th><Th>Action</Th><Th>Utilisateur</Th><Th>Message</Th></tr>
+            </thead>
+            <tbody>
+              {logs.map((l) => (
+                <tr key={l.id} className="border-t border-secondary-100 odd:bg-white even:bg-secondary-50/50">
+                  <td className="px-5 py-2.5 text-gray-500 whitespace-nowrap text-xs">{new Date(l.created_at).toLocaleString('fr-FR')}</td>
+                  <td className="px-5 py-2.5">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${NIVEAU_BADGE[l.niveau] || 'bg-gray-100 text-gray-700'}`}>{l.niveau}</span>
+                  </td>
+                  <td className="px-5 py-2.5 font-mono text-xs text-gray-700">{l.action}</td>
+                  <td className="px-5 py-2.5 text-gray-600">{l.utilisateur || '—'}</td>
+                  <td className="px-5 py-2.5 text-gray-600">{l.message || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between px-5 py-3 border-t border-secondary-200 text-sm">
+        <span className="text-gray-500">Page {pag.page} / {pag.total_pages || 1}</span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="px-3 py-1.5 rounded-md border border-secondary-300 disabled:opacity-40 hover:bg-secondary-100"
+          >
+            Précédent
+          </button>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page >= (pag.total_pages || 1)}
+            className="px-3 py-1.5 rounded-md border border-secondary-300 disabled:opacity-40 hover:bg-secondary-100"
+          >
+            Suivant
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 // ── Page principale — layout AdminLTE (sidebar + contenu) ────────────────────
 export default function AdminPage() {
   const [active, setActive] = useState('overview');
@@ -472,6 +569,7 @@ export default function AdminPage() {
           {active === 'boutiques'  && <BoutiquesSection />}
           {active === 'categories' && <CategoriesSection />}
           {active === 'avis'       && <AvisSection />}
+          {active === 'logs'       && <JournalSection />}
         </div>
       </div>
     </div>

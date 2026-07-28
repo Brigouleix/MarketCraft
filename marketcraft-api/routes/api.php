@@ -11,6 +11,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CommandeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\FactureController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RecommandationController;
@@ -141,6 +142,8 @@ Route::middleware('jwt')->group(function () {
 Route::middleware('jwt')->group(function () {
     Route::get('/orders', [CommandeController::class, 'index']);
     Route::get('/orders/{id}', [CommandeController::class, 'show'])->whereNumber('id');
+    // Facture PDF de la commande (client proprietaire ou admin).
+    Route::get('/orders/{id}/facture', FactureController::class)->whereNumber('id');
     Route::post('/orders', [CommandeController::class, 'store']);
     Route::put('/orders/{id}/status', [CommandeController::class, 'updateStatus'])
         ->whereNumber('id')
@@ -186,6 +189,8 @@ Route::prefix('admin')->middleware(['jwt', 'role:admin'])->group(function () {
 
     Route::get('/avis', [AdminController::class, 'avis']);
     Route::delete('/avis/{id}', [AdminController::class, 'deleteAvis'])->whereNumber('id');
+
+    Route::get('/logs', [AdminController::class, 'logs']);
 
     Route::get('/categories', [AdminController::class, 'categories']);
     Route::post('/categories', [AdminController::class, 'createCategorie']);
