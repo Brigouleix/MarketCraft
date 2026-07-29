@@ -8,6 +8,39 @@ import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import './index.css';
 
+// ── ResizeObserver : bruit de l'overlay de développement ─────────────────────
+// « ResizeObserver loop completed with undelivered notifications » est un
+// avertissement bénin du navigateur : un observateur a redimensionné un
+// élément pendant son propre cycle, le navigateur reporte simplement la
+// notification à la frame suivante. Rien n'est cassé, mais l'overlay d'erreur
+// de webpack-dev-server l'affiche en plein écran comme un crash.
+// On le neutralise uniquement en développement ; en production l'overlay
+// n'existe pas et ce code ne s'exécute pas.
+if (process.env.NODE_ENV === 'development') {
+  const RESIZE_OBSERVER_NOISE =
+    /^(?:ResizeObserver loop (?:limit exceeded|completed with undelivered notifications))/;
+
+  const masquerOverlay = () => {
+    document
+      .querySelectorAll('#webpack-dev-server-client-overlay, iframe#webpack-dev-server-client-overlay')
+      .forEach((el) => el.remove());
+  };
+
+  window.addEventListener('error', (e) => {
+    if (RESIZE_OBSERVER_NOISE.test(e.message || '')) {
+      e.stopImmediatePropagation();
+      masquerOverlay();
+    }
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    if (RESIZE_OBSERVER_NOISE.test(e.reason?.message || '')) {
+      e.stopImmediatePropagation();
+      masquerOverlay();
+    }
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

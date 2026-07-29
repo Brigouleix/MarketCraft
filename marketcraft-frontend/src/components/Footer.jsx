@@ -20,7 +20,7 @@ const footerLinks = {
     { label: 'FAQ', to: '#' },
     { label: 'Livraison & retours', to: '#' },
     { label: 'Nous contacter', to: '#' },
-    { label: 'Mentions légales', to: '#' },
+    { label: 'Mentions légales', to: '/mentions-legales' },
   ],
 };
 
@@ -135,9 +135,18 @@ export default function Footer() {
             © {new Date().getFullYear()} MarketCraft. Tous droits réservés.
           </p>
           <div className="flex items-center gap-4 text-xs text-gray-500">
-            <a href="#" className="hover:text-white transition-colors">Politique de confidentialité</a>
-            <a href="#" className="hover:text-white transition-colors">CGV</a>
-            <a href="#" className="hover:text-white transition-colors">Cookies</a>
+            <Link to="/confidentialite" className="hover:text-white transition-colors">
+              Politique de confidentialité
+            </Link>
+            <Link to="/conditions-utilisation" className="hover:text-white transition-colors">
+              Conditions d'utilisation
+            </Link>
+            <Link to="/mentions-legales" className="hover:text-white transition-colors">
+              Mentions légales
+            </Link>
+            <Link to="/cookies" className="hover:text-white transition-colors">
+              Cookies
+            </Link>
           </div>
         </div>
       </div>

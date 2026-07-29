@@ -32,7 +32,7 @@ describe('LoginPage', () => {
     renderWithAuth(<LoginPage />);
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/mot de passe/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /connexion/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /se connecter/i })).toBeInTheDocument();
   });
 
   it('appelle login avec les bons identifiants', async () => {
@@ -45,7 +45,7 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByLabelText(/mot de passe/i), {
       target: { value: 'password123' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /connexion/i }));
+    fireEvent.click(screen.getByRole('button', { name: /se connecter/i }));
 
     await waitFor(() => {
       expect(login).toHaveBeenCalledWith('paul.martin@example.com', 'password123');
@@ -58,7 +58,7 @@ describe('LoginPage', () => {
 
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'wrong@example.com' } });
     fireEvent.change(screen.getByLabelText(/mot de passe/i), { target: { value: 'wrongpass' } });
-    fireEvent.click(screen.getByRole('button', { name: /connexion/i }));
+    fireEvent.click(screen.getByRole('button', { name: /se connecter/i }));
 
     await waitFor(() => {
       expect(login).toHaveBeenCalled();

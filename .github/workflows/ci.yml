@@ -1,0 +1,165 @@
+# ============================================================
+#  MarketCraft — Intégration continue (GitHub Actions)
+#  Exécute les 3 suites de tests + le build de production
+#  à chaque push sur main et à chaque Pull Request.
+# ============================================================
+name: CI
+
+on:
+  push:
+    # Les branches de travail sont incluses : une CI qui ne tourne que sur
+    # main ne previent des regressions qu'une fois la fusion faite.
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ----------------------------------------------------------
+  # Backend PHP : PHPUnit (16 tests / 31 assertions)
+  # ----------------------------------------------------------
+  backend-tests:
+    name: Backend — PHPUnit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketcraft-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, mbstring
+          coverage: none
+
+      - name: Installer les dépendances Composer
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Analyse syntaxique
+        run: find app routes public -name "*.php" -exec php -l {} \; | (! grep -v "No syntax errors")
+
+      - name: Exécuter PHPUnit
+        run: vendor/bin/phpunit --colors=never
+
+  # ----------------------------------------------------------
+  # Back-end Laravel 11 : PHPUnit (94 tests / 309 assertions)
+  #
+  # Coexiste avec le job `backend-tests` ci-dessus : les deux
+  # back-ends sont maintenus en parallele jusqu'a la bascule
+  # complete du front. Retirer l'ancien job le jour ou
+  # marketcraft-backend sortira du depot.
+  # ----------------------------------------------------------
+  api-tests:
+    name: API Laravel — PHPUnit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketcraft-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          # sqlite3 et pdo_sqlite sont indispensables : la suite tourne
+          # sur une base en memoire, sans service MySQL a provisionner.
+          extensions: pdo, pdo_sqlite, sqlite3, mbstring, bcmath, intl, fileinfo
+          coverage: none
+
+      - name: Mettre en cache les dependances Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('marketcraft-api/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Installer les dependances
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Analyse syntaxique
+        run: |
+          find app config database routes tests -name "*.php" -print0 \
+            | xargs -0 -n1 php -l \
+            | (! grep -v "No syntax errors")
+
+      - name: Verifier qu aucun secret n est commite
+        run: |
+          # .env ne doit jamais entrer dans le depot : il porte JWT_SECRET,
+          # les identifiants de base et la cle du fournisseur IA.
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env est suivi par Git — retirez-le immediatement."
+            exit 1
+          fi
+          echo "OK : aucun .env suivi."
+
+      - name: Executer la suite de tests
+        run: php artisan test
+        env:
+          # Valeurs de test uniquement. Les vraies cles vivent dans .env,
+          # jamais dans le depot ni dans ce fichier.
+          APP_ENV: testing
+          APP_KEY: base64:V0ZBSVRNQUlOTUFSS0VUQ1JBRlRURVNUS0VZMDE=
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          JWT_SECRET: cle_de_ci_uniquement_surtout_pas_en_production_0123456789
+
+  # ----------------------------------------------------------
+  # Frontend React : Jest + RTL (12 tests) puis build strict
+  # ----------------------------------------------------------
+  frontend-tests:
+    name: Frontend — Jest + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketcraft-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: marketcraft-frontend/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Exécuter les tests
+        run: npx react-scripts test --watchAll=false
+        env:
+          CI: true
+
+      - name: Build de production (warnings = erreurs)
+        run: npm run build
+        env:
+          CI: true
+
+  # ----------------------------------------------------------
+  # Mobile React Native : Jest (service API)
+  # ----------------------------------------------------------
+  mobile-tests:
+    name: Mobile — Jest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketcraft-mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: marketcraft-mobile/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci --legacy-peer-deps
+
+      - name: Exécuter les tests
+        run: npm test -- --watchAll=false
+        env:
+          CI: true

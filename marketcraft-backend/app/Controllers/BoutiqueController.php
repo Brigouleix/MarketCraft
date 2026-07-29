@@ -33,6 +33,19 @@ class BoutiqueController extends Controller
     }
 
     // ------------------------------------------------------------------
+    // GET /boutiques/me  (JWT) — boutique du vendeur connecté, ou null
+    // ------------------------------------------------------------------
+
+    public function me(array $params = []): void
+    {
+        $auth = Auth::getCurrentUser();
+
+        $boutiques = $this->boutiqueModel->findByVendeur((int) $auth['sub']);
+
+        $this->success($boutiques[0] ?? null);
+    }
+
+    // ------------------------------------------------------------------
     // GET /boutiques/:id
     // ------------------------------------------------------------------
 

@@ -138,12 +138,24 @@ abstract class Controller
         foreach ($rules as $field => $rule) {
             $ruleList = explode('|', $rule);
 
+            // Un champ absent ou vide n'est validé que par la règle « required ».
+            $isPresent = isset($data[$field])
+                && !(is_string($data[$field]) && trim($data[$field]) === '');
+
             foreach ($ruleList as $r) {
                 if ($r === 'required') {
-                    if (!isset($data[$field]) || (is_string($data[$field]) && trim($data[$field]) === '')) {
+                    if (!$isPresent) {
                         $errors[$field][] = "Le champ «{$field}» est obligatoire.";
                     }
-                } elseif (str_starts_with($r, 'min:')) {
+                    continue;
+                }
+
+                // Les autres règles ne s'appliquent qu'à un champ effectivement fourni.
+                if (!$isPresent) {
+                    continue;
+                }
+
+                if (str_starts_with($r, 'min:')) {
                     $min = (int) substr($r, 4);
                     $val = $data[$field] ?? '';
                     if (is_string($val) && mb_strlen($val) < $min) {

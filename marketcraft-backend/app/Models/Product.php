@@ -23,75 +23,62 @@ class Product
     /**
      * Retourne les produits actifs avec pagination et filtres optionnels.
      *
-     * @param int         $page
-     * @param int         $limit
-     * @param string|null $search     Recherche FULLTEXT sur nom + description
-     * @param int|null    $categorieId
-     * @param int|null    $boutiqueId
-     * @param float|null  $prixMin
-     * @param float|null  $prixMax
-     * @param string      $sort       Colonne de tri
-     * @param string      $order      ASC ou DESC
+     * @param int             $page
+     * @param int             $limit
+     * @param string|null     $search    Recherche sur nom + description
+     * @param int|string|null $categorie Id numérique ou slug (préfixe accepté : 'ceramique' matche 'ceramique-poterie')
+     * @param int|null        $boutiqueId
+     * @param float|null      $prixMin
+     * @param float|null      $prixMax
+     * @param string          $sort      Colonne de tri
+     * @param string          $order     ASC ou DESC
+     * @param float|null      $noteMin   Note moyenne minimale (1 à 5)
      */
     public function findAll(
-        int     $page        = 1,
-        int     $limit       = 20,
-        ?string $search      = null,
-        ?int    $categorieId = null,
-        ?int    $boutiqueId  = null,
-        ?float  $prixMin     = null,
-        ?float  $prixMax     = null,
-        string  $sort        = 'created_at',
-        string  $order       = 'DESC'
+        int             $page       = 1,
+        int             $limit      = 20,
+        ?string         $search     = null,
+        int|string|null $categorie  = null,
+        ?int            $boutiqueId = null,
+        ?float          $prixMin    = null,
+        ?float          $prixMax    = null,
+        string          $sort       = 'created_at',
+        string          $order      = 'DESC',
+        ?float          $noteMin    = null,
+        int|string|null $materiau   = null
     ): array {
         $offset = ($page - 1) * $limit;
-        $where  = ['p.est_actif = 1'];
-        $params = [];
 
-        if (!empty($search)) {
-            $where[]          = '(p.nom LIKE :search OR p.description LIKE :search2)';
-            $params[':search']  = '%' . $search . '%';
-            $params[':search2'] = '%' . $search . '%';
-        }
+        [$whereClause, $having, $params] = $this->buildFilters(
+            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin, $materiau
+        );
 
-        if ($categorieId !== null) {
-            $where[]              = 'p.categorie_id = :cat_id';
-            $params[':cat_id']    = $categorieId;
-        }
-
-        if ($boutiqueId !== null) {
-            $where[]              = 'p.boutique_id = :bout_id';
-            $params[':bout_id']   = $boutiqueId;
-        }
-
-        if ($prixMin !== null) {
-            $where[]              = 'p.prix >= :prix_min';
-            $params[':prix_min']  = $prixMin;
-        }
-
-        if ($prixMax !== null) {
-            $where[]              = 'p.prix <= :prix_max';
-            $params[':prix_max']  = $prixMax;
-        }
-
-        // Whitelist des colonnes de tri
-        $allowedSort  = ['created_at', 'prix', 'nom', 'stock'];
-        $allowedOrder = ['ASC', 'DESC'];
-        $sortCol  = in_array($sort, $allowedSort, true)   ? $sort  : 'created_at';
-        $orderDir = in_array(strtoupper($order), $allowedOrder, true) ? strtoupper($order) : 'DESC';
-
-        $whereClause = implode(' AND ', $where);
+        // Whitelist des colonnes de tri (colonnes brutes ou agrégats calculés)
+        $sortMap = [
+            'created_at' => 'p.created_at',
+            'prix'       => 'p.prix',
+            'nom'        => 'p.nom',
+            'stock'      => 'p.stock',
+            'note'       => 'note_moyenne',
+            'nb_avis'    => 'nb_avis',
+        ];
+        $sortCol  = $sortMap[$sort] ?? 'p.created_at';
+        $orderDir = in_array(strtoupper($order), ['ASC', 'DESC'], true) ? strtoupper($order) : 'DESC';
 
         $sql = "SELECT p.*, b.nom AS boutique_nom, c.nom AS categorie_nom,
                        COALESCE(AVG(a.note), 0) AS note_moyenne,
-                       COUNT(DISTINCT a.id) AS nb_avis
+                       COUNT(DISTINCT a.id) AS nb_avis,
+                       GROUP_CONCAT(DISTINCT CONCAT(c2.id, ':', c2.nom) SEPARATOR '||') AS categories_concat
                 FROM produits p
                 LEFT JOIN boutiques b ON b.id = p.boutique_id
                 LEFT JOIN categories c ON c.id = p.categorie_id
+                LEFT JOIN produit_categorie pc ON pc.produit_id = p.id
+                LEFT JOIN categories c2 ON c2.id = pc.categorie_id
                 LEFT JOIN avis a ON a.produit_id = p.id
                 WHERE {$whereClause}
                 GROUP BY p.id
-                ORDER BY p.{$sortCol} {$orderDir}
+                {$having}
+                ORDER BY {$sortCol} {$orderDir}
                 LIMIT :limit OFFSET :offset";
 
         $stmt = $this->db->prepare($sql);
@@ -103,49 +90,140 @@ class Product
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll();
+        return array_map([$this, 'hydrate'], $stmt->fetchAll());
+    }
+
+    /**
+     * Normalise une ligne produit pour les clients de l'API :
+     * décode les colonnes JSON et expose les alias attendus par le front
+     * (objet boutique imbriqué, nom de catégorie).
+     */
+    private function hydrate(array $row): array
+    {
+        foreach (['images', 'tags'] as $col) {
+            if (isset($row[$col]) && is_string($row[$col])) {
+                $row[$col] = json_decode($row[$col], true) ?? [];
+            }
+        }
+
+        if (!empty($row['boutique_nom'])) {
+            $row['boutique'] = [
+                'id'  => (int) ($row['boutique_id'] ?? 0),
+                'nom' => $row['boutique_nom'],
+            ];
+        }
+
+        if (!isset($row['categorie']) && !empty($row['categorie_nom'])) {
+            $row['categorie'] = $row['categorie_nom'];
+        }
+
+        // Liste complète des catégories (table de liaison produit_categorie)
+        $row['categories'] = [];
+        if (!empty($row['categories_concat'])) {
+            foreach (explode('||', $row['categories_concat']) as $pair) {
+                [$catId, $catNom] = array_pad(explode(':', $pair, 2), 2, '');
+                if ($catId !== '') {
+                    $row['categories'][] = ['id' => (int) $catId, 'nom' => $catNom];
+                }
+            }
+        }
+        unset($row['categories_concat']);
+
+        return $row;
     }
 
     /**
      * Compte les produits correspondant aux filtres (pour la pagination).
      */
     public function countAll(
-        ?string $search      = null,
-        ?int    $categorieId = null,
-        ?int    $boutiqueId  = null,
-        ?float  $prixMin     = null,
-        ?float  $prixMax     = null
+        ?string         $search     = null,
+        int|string|null $categorie  = null,
+        ?int            $boutiqueId = null,
+        ?float          $prixMin    = null,
+        ?float          $prixMax    = null,
+        ?float          $noteMin    = null,
+        int|string|null $materiau   = null
     ): int {
-        $where  = ['est_actif = 1'];
-        $params = [];
+        [$whereClause, $having, $params] = $this->buildFilters(
+            $search, $categorie, $boutiqueId, $prixMin, $prixMax, $noteMin, $materiau
+        );
 
-        if (!empty($search)) {
-            $where[]           = '(nom LIKE :search OR description LIKE :search2)';
-            $params[':search']  = '%' . $search . '%';
-            $params[':search2'] = '%' . $search . '%';
-        }
-        if ($categorieId !== null) {
-            $where[]           = 'categorie_id = :cat_id';
-            $params[':cat_id'] = $categorieId;
-        }
-        if ($boutiqueId !== null) {
-            $where[]            = 'boutique_id = :bout_id';
-            $params[':bout_id'] = $boutiqueId;
-        }
-        if ($prixMin !== null) {
-            $where[]             = 'prix >= :prix_min';
-            $params[':prix_min'] = $prixMin;
-        }
-        if ($prixMax !== null) {
-            $where[]             = 'prix <= :prix_max';
-            $params[':prix_max'] = $prixMax;
-        }
+        $sql = "SELECT COUNT(*) FROM (
+                    SELECT p.id
+                    FROM produits p
+                    LEFT JOIN categories c ON c.id = p.categorie_id
+                    LEFT JOIN avis a ON a.produit_id = p.id
+                    WHERE {$whereClause}
+                    GROUP BY p.id
+                    {$having}
+                ) AS filtered";
 
-        $whereClause = implode(' AND ', $where);
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM produits WHERE {$whereClause}");
+        $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
         return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Construit la clause WHERE, la clause HAVING et les paramètres liés,
+     * partagés entre findAll() et countAll().
+     *
+     * @return array{0: string, 1: string, 2: array}
+     */
+    private function buildFilters(
+        ?string         $search,
+        int|string|null $categorie,
+        ?int            $boutiqueId,
+        ?float          $prixMin,
+        ?float          $prixMax,
+        ?float          $noteMin,
+        int|string|null $materiau = null
+    ): array {
+        $where  = ['p.est_actif = 1'];
+        $params = [];
+
+        if (!empty($search)) {
+            $where[]            = '(p.nom LIKE :search OR p.description LIKE :search2)';
+            $params[':search']  = '%' . $search . '%';
+            $params[':search2'] = '%' . $search . '%';
+        }
+
+        // Les deux groupes de filtres (objet et matériau) partagent la même
+        // mécanique : au sein d'un groupe les valeurs sont en OU, mais les deux
+        // groupes se croisent en ET. Sélectionner « Céramique » et « Argile »
+        // renvoie donc les céramiques EN argile, pas leur union.
+        $clauseCategorie = $this->buildCategorieExists($categorie, 'cat', $params);
+        if ($clauseCategorie !== null) {
+            $where[] = $clauseCategorie;
+        }
+
+        $clauseMateriau = $this->buildCategorieExists($materiau, 'mat', $params);
+        if ($clauseMateriau !== null) {
+            $where[] = $clauseMateriau;
+        }
+
+        if ($boutiqueId !== null) {
+            $where[]            = 'p.boutique_id = :bout_id';
+            $params[':bout_id'] = $boutiqueId;
+        }
+
+        if ($prixMin !== null) {
+            $where[]             = 'p.prix >= :prix_min';
+            $params[':prix_min'] = $prixMin;
+        }
+
+        if ($prixMax !== null) {
+            $where[]             = 'p.prix <= :prix_max';
+            $params[':prix_max'] = $prixMax;
+        }
+
+        $having = '';
+        if ($noteMin !== null && $noteMin > 0) {
+            $having              = 'HAVING COALESCE(AVG(a.note), 0) >= :note_min';
+            $params[':note_min'] = $noteMin;
+        }
+
+        return [implode(' AND ', $where), $having, $params];
     }
 
     public function findById(int $id): ?array
@@ -154,10 +232,13 @@ class Product
             'SELECT p.*, b.nom AS boutique_nom, b.vendeur_id,
                     c.nom AS categorie_nom,
                     COALESCE(AVG(a.note), 0) AS note_moyenne,
-                    COUNT(DISTINCT a.id) AS nb_avis
+                    COUNT(DISTINCT a.id) AS nb_avis,
+                    GROUP_CONCAT(DISTINCT CONCAT(c2.id, \':\', c2.nom) SEPARATOR \'||\') AS categories_concat
              FROM produits p
              LEFT JOIN boutiques b ON b.id = p.boutique_id
              LEFT JOIN categories c ON c.id = p.categorie_id
+             LEFT JOIN produit_categorie pc ON pc.produit_id = p.id
+             LEFT JOIN categories c2 ON c2.id = pc.categorie_id
              LEFT JOIN avis a ON a.produit_id = p.id
              WHERE p.id = :id AND p.est_actif = 1
              GROUP BY p.id
@@ -166,7 +247,7 @@ class Product
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
 
-        return $row ?: null;
+        return $row ? $this->hydrate($row) : null;
     }
 
     public function getByBoutique(int $boutiqueId, int $page = 1, int $limit = 20): array
@@ -190,7 +271,7 @@ class Product
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll();
+        return array_map([$this, 'hydrate'], $stmt->fetchAll());
     }
 
     // ------------------------------------------------------------------
@@ -201,6 +282,9 @@ class Product
     {
         $slug = $this->generateSlug($data['nom']);
 
+        // Catégories multiples : la première devient la catégorie principale
+        $categorieIds = $this->normalizeCategorieIds($data);
+
         $stmt = $this->db->prepare(
             'INSERT INTO produits
                (boutique_id, categorie_id, nom, slug, description, prix, stock, images, tags, est_fait_main)
@@ -210,7 +294,7 @@ class Product
 
         $stmt->execute([
             ':boutique_id'   => $data['boutique_id'],
-            ':categorie_id'  => $data['categorie_id'] ?? null,
+            ':categorie_id'  => $categorieIds[0] ?? null,
             ':nom'           => trim($data['nom']),
             ':slug'          => $slug,
             ':description'   => $data['description'] ?? null,
@@ -221,7 +305,53 @@ class Product
             ':est_fait_main' => (int) ($data['est_fait_main'] ?? 1),
         ]);
 
-        return $this->findById((int) $this->db->lastInsertId());
+        $id = (int) $this->db->lastInsertId();
+        $this->syncCategories($id, $categorieIds);
+
+        return $this->findById($id);
+    }
+
+    /**
+     * Extrait la liste des ids de catégories depuis les données reçues :
+     * `categorie_ids` (tableau) prioritaire, sinon `categorie_id` (scalaire).
+     *
+     * @return int[] Ids uniques, sans zéros ni doublons
+     */
+    private function normalizeCategorieIds(array $data): array
+    {
+        $ids = [];
+        if (isset($data['categorie_ids']) && is_array($data['categorie_ids'])) {
+            $ids = $data['categorie_ids'];
+        } elseif (!empty($data['categorie_id'])) {
+            $ids = [$data['categorie_id']];
+        }
+
+        $ids = array_map('intval', $ids);
+        $ids = array_filter($ids, fn(int $id) => $id > 0);
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * Remplace les liaisons produit ↔ catégories par la liste fournie.
+     *
+     * @param int[] $categorieIds
+     */
+    private function syncCategories(int $productId, array $categorieIds): void
+    {
+        $this->db->prepare('DELETE FROM produit_categorie WHERE produit_id = :id')
+                 ->execute([':id' => $productId]);
+
+        if (empty($categorieIds)) {
+            return;
+        }
+
+        $stmt = $this->db->prepare(
+            'INSERT IGNORE INTO produit_categorie (produit_id, categorie_id) VALUES (:pid, :cid)'
+        );
+        foreach ($categorieIds as $catId) {
+            $stmt->execute([':pid' => $productId, ':cid' => $catId]);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -230,6 +360,16 @@ class Product
 
     public function update(int $id, array $data): ?array
     {
+        // Catégories multiples : synchroniser la liaison et aligner la
+        // catégorie principale sur la première de la liste
+        if (isset($data['categorie_ids']) && is_array($data['categorie_ids'])) {
+            $categorieIds = $this->normalizeCategorieIds($data);
+            $this->syncCategories($id, $categorieIds);
+            $data['categorie_id'] = $categorieIds[0] ?? null;
+        } elseif (array_key_exists('categorie_id', $data)) {
+            $this->syncCategories($id, $this->normalizeCategorieIds($data));
+        }
+
         $fields = [];
         $params = [':id' => $id];
 
@@ -294,6 +434,68 @@ class Product
     // ------------------------------------------------------------------
     // Slug
     // ------------------------------------------------------------------
+
+    /**
+     * Construit une sous-requête EXISTS pour un groupe de catégories.
+     *
+     * Le paramètre peut contenir une ou plusieurs valeurs séparées par des
+     * virgules (ids numériques ou slugs). Le produit matche s'il est rattaché
+     * à AU MOINS UNE d'entre elles, via la table de liaison produit_categorie
+     * (qui couvre aussi la catégorie principale, migrée dedans).
+     *
+     * @param  string $prefixe Préfixe des marqueurs nommés, pour éviter toute
+     *                         collision entre les différents groupes de filtres.
+     * @param  array  $params  Tableau de paramètres liés, complété par référence.
+     * @return string|null     La clause EXISTS, ou null si aucun filtre.
+     */
+    private function buildCategorieExists(int|string|null $valeur, string $prefixe, array &$params): ?string
+    {
+        if ($valeur === null || $valeur === '') {
+            return null;
+        }
+
+        $valeurs = array_values(array_filter(array_map('trim', explode(',', (string) $valeur))));
+
+        $ids   = [];
+        $slugs = [];
+        foreach ($valeurs as $v) {
+            if (is_numeric($v)) {
+                $ids[] = (int) $v;
+            } else {
+                $slugs[] = $v;
+            }
+        }
+
+        $conds = [];
+
+        if (!empty($ids)) {
+            $ph = [];
+            foreach ($ids as $i => $id) {
+                $key          = ":{$prefixe}_id_{$i}";
+                $ph[]         = $key;
+                $params[$key] = $id;
+            }
+            $conds[] = "pcf_{$prefixe}.categorie_id IN (" . implode(', ', $ph) . ')';
+        }
+
+        if (!empty($slugs)) {
+            $ph = [];
+            foreach ($slugs as $i => $slug) {
+                $key          = ":{$prefixe}_slug_{$i}";
+                $ph[]         = $key;
+                $params[$key] = $slug;
+            }
+            $conds[] = "cf_{$prefixe}.slug IN (" . implode(', ', $ph) . ')';
+        }
+
+        if (empty($conds)) {
+            return null;
+        }
+
+        return "EXISTS (SELECT 1 FROM produit_categorie pcf_{$prefixe}
+                         JOIN categories cf_{$prefixe} ON cf_{$prefixe}.id = pcf_{$prefixe}.categorie_id
+                         WHERE pcf_{$prefixe}.produit_id = p.id AND (" . implode(' OR ', $conds) . '))';
+    }
 
     private function generateSlug(string $nom, ?int $excludeId = null): string
     {

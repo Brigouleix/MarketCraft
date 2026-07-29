@@ -24,8 +24,8 @@ class Avis
     {
         // Un utilisateur ne peut poster qu'un seul avis par produit (contrainte UNIQUE en BDD)
         $stmt = $this->db->prepare(
-            'INSERT INTO avis (produit_id, utilisateur_id, note, titre, commentaire)
-             VALUES (:produit_id, :utilisateur_id, :note, :titre, :commentaire)'
+            'INSERT INTO avis (produit_id, utilisateur_id, note, titre, commentaire, est_verifie)
+             VALUES (:produit_id, :utilisateur_id, :note, :titre, :commentaire, :est_verifie)'
         );
 
         $stmt->execute([
@@ -34,6 +34,7 @@ class Avis
             ':note'           => (int) $data['note'],
             ':titre'          => $data['titre']       ?? null,
             ':commentaire'    => $data['commentaire'] ?? null,
+            ':est_verifie'    => (int) ($data['est_verifie'] ?? 0),
         ]);
 
         return $this->findById((int) $this->db->lastInsertId());

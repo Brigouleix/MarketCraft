@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
+import { useCategories } from '../hooks/useCategories';
 import ProductCard from '../components/ProductCard';
 
+// Secours si l'API catégories est indisponible (et pour les produits mock)
 const CATEGORIES = [
-  'bijoux', 'ceramique', 'mode', 'decoration', 'floral', 'art', 'textile', 'papeterie', 'cuisine', 'autre',
+  'bois', 'ceramique', 'bijoux', 'textile', 'decoration-maison', 'menuiserie', 'poterie', 'accessoires', 'couture',
 ];
 
 const TRI_OPTIONS = [
@@ -36,10 +38,13 @@ function ProductSkeleton() {
 export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Onglet actif du panneau de filtres : « objet » ou « materiau »
+  const [filterTab, setFilterTab] = useState('objet');
 
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
     categorie: searchParams.get('categorie') || '',
+    materiau: searchParams.get('materiau') || '',
     prix_min: searchParams.get('prix_min') || '',
     prix_max: searchParams.get('prix_max') || '',
     note_min: Number(searchParams.get('note_min')) || 0,
@@ -48,12 +53,15 @@ export default function ProductsPage() {
   });
 
   const [localSearch, setLocalSearch] = useState(filters.search);
+  // Saisie locale des prix, appliquée au blur / Entrée (évite une requête par frappe)
+  const [localPrix, setLocalPrix] = useState({ min: filters.prix_min, max: filters.prix_max });
 
   // Sync URL params → filters
   useEffect(() => {
     setFilters({
       search: searchParams.get('search') || '',
       categorie: searchParams.get('categorie') || '',
+      materiau: searchParams.get('materiau') || '',
       prix_min: searchParams.get('prix_min') || '',
       prix_max: searchParams.get('prix_max') || '',
       note_min: Number(searchParams.get('note_min')) || 0,
@@ -61,9 +69,34 @@ export default function ProductsPage() {
       page: Number(searchParams.get('page')) || 1,
     });
     setLocalSearch(searchParams.get('search') || '');
+    setLocalPrix({
+      min: searchParams.get('prix_min') || '',
+      max: searchParams.get('prix_max') || '',
+    });
   }, [searchParams]);
 
   const { data, isLoading, isError } = useProducts(filters);
+
+  // Catégories réelles (même source que le formulaire produit du dashboard)
+  const { data: categoriesData } = useCategories();
+  const categories = categoriesData?.length
+    ? categoriesData
+    : CATEGORIES.map((slug) => ({ id: slug, nom: slug, slug }));
+
+  // Les catégories sont hiérarchisées sous deux racines : « Objet » et
+  // « Matériau ». On les répartit en deux groupes de filtres indépendants.
+  // Repli : si la hiérarchie n'est pas encore en base (parent_id vide), tout
+  // reste affiché dans l'onglet Objet, comme avant.
+  const racineObjet = categories.find((c) => c.slug === 'objet');
+  const racineMateriau = categories.find((c) => c.slug === 'materiau');
+
+  const categoriesObjet = racineObjet
+    ? categories.filter((c) => c.parent_id === racineObjet.id)
+    : categories.filter((c) => !c.parent_id && c.slug !== 'materiau');
+
+  const categoriesMateriau = racineMateriau
+    ? categories.filter((c) => c.parent_id === racineMateriau.id)
+    : [];
 
   // Use mock data when API is unavailable
   const mockProducts = Array.from({ length: 12 }, (_, i) => ({
@@ -79,16 +112,41 @@ export default function ProductsPage() {
   }));
 
   const products = data?.data || data?.products || (isLoading ? [] : mockProducts);
-  const totalPages = data?.last_page || data?.meta?.last_page || 1;
-  const totalItems = data?.total || data?.meta?.total || mockProducts.length;
+  const totalPages = data?.pagination?.total_pages || data?.last_page || data?.meta?.last_page || 1;
+  const totalItems = data?.pagination?.total ?? data?.total ?? data?.meta?.total ?? mockProducts.length;
 
-  const updateFilter = (key, value) => {
+  // Applique un ou plusieurs filtres d'un coup (un seul setSearchParams,
+  // sinon deux appels successifs s'écrasent mutuellement)
+  const updateFilters = (updates) => {
     const newParams = new URLSearchParams(searchParams);
-    if (value === '' || value === 0) newParams.delete(key);
-    else newParams.set(key, value);
-    if (key !== 'page') newParams.delete('page');
+    let pageChange = false;
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === '' || value === 0) newParams.delete(key);
+      else newParams.set(key, value);
+      if (key === 'page') pageChange = true;
+    });
+    if (!pageChange) newParams.delete('page');
     setSearchParams(newParams);
   };
+
+  const updateFilter = (key, value) => updateFilters({ [key]: value });
+
+  // Catégories sélectionnées : le paramètre "categorie" est une liste de slugs
+  // séparés par des virgules (multi-sélection).
+  const selectedCategories = filters.categorie ? filters.categorie.split(',').filter(Boolean) : [];
+  const selectedMateriaux = filters.materiau ? filters.materiau.split(',').filter(Boolean) : [];
+
+  // Les deux groupes se croisent en ET côté API : cocher « Céramique » et
+  // « Argile » renvoie les céramiques en argile, pas leur union.
+  const toggleDans = (key, selection) => (slug) => {
+    const next = selection.includes(slug)
+      ? selection.filter((s) => s !== slug)
+      : [...selection, slug];
+    updateFilter(key, next.join(','));
+  };
+
+  const toggleCategorie = toggleDans('categorie', selectedCategories);
+  const toggleMateriau = toggleDans('materiau', selectedMateriaux);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -100,10 +158,17 @@ export default function ProductsPage() {
     setLocalSearch('');
   };
 
-  const hasActiveFilters = filters.search || filters.categorie || filters.prix_min || filters.prix_max || filters.note_min > 0;
+  const hasActiveFilters = filters.search || filters.categorie || filters.materiau
+    || filters.prix_min || filters.prix_max || filters.note_min > 0;
 
-  // Sidebar component
-  const Sidebar = () => (
+  // Applique les prix saisis localement aux filtres URL
+  const applyPrix = () =>
+    updateFilters({ prix_min: localPrix.min.trim(), prix_max: localPrix.max.trim() });
+
+  // JSX de la sidebar (constante, PAS un composant inline : un composant
+  // défini dans le rendu serait remonté à chaque frappe et les champs
+  // perdraient le focus)
+  const sidebar = (
     <aside className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-serif font-bold text-lg text-primary">Filtres</h2>
@@ -114,35 +179,78 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Category */}
+      {/* Catégories, réparties en deux onglets : Objet et Matériau.
+          Multi-sélection dans chaque onglet ; les deux se croisent en ET. */}
       <div>
-        <h3 className="font-semibold text-sm text-gray-700 mb-3">Catégorie</h3>
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="categorie"
-              value=""
-              checked={!filters.categorie}
-              onChange={() => updateFilter('categorie', '')}
-              className="text-primary"
-            />
-            <span className="text-sm text-gray-700">Toutes</span>
-          </label>
-          {CATEGORIES.map((cat) => (
-            <label key={cat} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="categorie"
-                value={cat}
-                checked={filters.categorie === cat}
-                onChange={() => updateFilter('categorie', cat)}
-                className="text-primary"
-              />
-              <span className="text-sm text-gray-700 capitalize">{cat}</span>
-            </label>
+        <div className="flex gap-1 border-b border-secondary-200 mb-3">
+          {[
+            { key: 'objet',    label: 'Objet',     count: selectedCategories.length },
+            { key: 'materiau', label: 'Matériaux', count: selectedMateriaux.length  },
+          ].map(({ key, label, count }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilterTab(key)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                filterTab === key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {label}
+              {count > 0 && (
+                <span className="text-[10px] bg-primary text-white rounded-full px-1.5 py-0.5 leading-none">
+                  {count}
+                </span>
+              )}
+            </button>
           ))}
         </div>
+
+        {(() => {
+          const estObjet = filterTab === 'objet';
+          const liste = estObjet ? categoriesObjet : categoriesMateriau;
+          const selection = estObjet ? selectedCategories : selectedMateriaux;
+          const toggle = estObjet ? toggleCategorie : toggleMateriau;
+          const cle = estObjet ? 'categorie' : 'materiau';
+
+          if (liste.length === 0) {
+            return (
+              <p className="text-xs text-gray-400 py-3">
+                Aucune catégorie dans ce groupe pour le moment.
+              </p>
+            );
+          }
+
+          return (
+            <>
+              {selection.length > 0 && (
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={() => updateFilter(cle, '')}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    Tout décocher
+                  </button>
+                </div>
+              )}
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                {liste.map((cat) => (
+                  <label key={cat.slug} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      value={cat.slug}
+                      checked={selection.includes(cat.slug)}
+                      onChange={() => toggle(cat.slug)}
+                      className="rounded text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Price range */}
@@ -152,8 +260,10 @@ export default function ProductsPage() {
           <input
             type="number"
             placeholder="Min"
-            value={filters.prix_min}
-            onChange={(e) => updateFilter('prix_min', e.target.value)}
+            value={localPrix.min}
+            onChange={(e) => setLocalPrix((p) => ({ ...p, min: e.target.value }))}
+            onBlur={applyPrix}
+            onKeyDown={(e) => e.key === 'Enter' && applyPrix()}
             min={0}
             className="input-field text-sm py-2"
           />
@@ -161,8 +271,10 @@ export default function ProductsPage() {
           <input
             type="number"
             placeholder="Max"
-            value={filters.prix_max}
-            onChange={(e) => updateFilter('prix_max', e.target.value)}
+            value={localPrix.max}
+            onChange={(e) => setLocalPrix((p) => ({ ...p, max: e.target.value }))}
+            onBlur={applyPrix}
+            onKeyDown={(e) => e.key === 'Enter' && applyPrix()}
             min={0}
             className="input-field text-sm py-2"
           />
@@ -253,16 +365,28 @@ export default function ProductsPage() {
               <button onClick={() => { updateFilter('search', ''); setLocalSearch(''); }}><X size={11} /></button>
             </span>
           )}
-          {filters.categorie && (
-            <span className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full capitalize">
-              {filters.categorie}
-              <button onClick={() => updateFilter('categorie', '')}><X size={11} /></button>
-            </span>
-          )}
+          {selectedCategories.map((slug) => {
+            const cat = categories.find((c) => c.slug === slug);
+            return (
+              <span key={slug} className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full capitalize">
+                {cat?.nom || slug}
+                <button onClick={() => toggleCategorie(slug)}><X size={11} /></button>
+              </span>
+            );
+          })}
+          {selectedMateriaux.map((slug) => {
+            const cat = categories.find((c) => c.slug === slug);
+            return (
+              <span key={`mat-${slug}`} className="flex items-center gap-1 text-xs bg-secondary-200 text-gray-700 px-3 py-1 rounded-full capitalize">
+                {cat?.nom || slug}
+                <button onClick={() => toggleMateriau(slug)}><X size={11} /></button>
+              </span>
+            );
+          })}
           {(filters.prix_min || filters.prix_max) && (
             <span className="flex items-center gap-1 text-xs bg-primary-100 text-primary px-3 py-1 rounded-full">
               {filters.prix_min || '0'}€ – {filters.prix_max || '∞'}€
-              <button onClick={() => { updateFilter('prix_min', ''); updateFilter('prix_max', ''); }}><X size={11} /></button>
+              <button onClick={() => updateFilters({ prix_min: '', prix_max: '' })}><X size={11} /></button>
             </span>
           )}
           {filters.note_min > 0 && (
@@ -278,7 +402,7 @@ export default function ProductsPage() {
         {/* Desktop Sidebar */}
         <div className="hidden lg:block w-56 flex-shrink-0">
           <div className="card p-5 sticky top-20">
-            <Sidebar />
+            {sidebar}
           </div>
         </div>
 
@@ -293,7 +417,7 @@ export default function ProductsPage() {
                   <X size={20} className="text-gray-500" />
                 </button>
               </div>
-              <Sidebar />
+              {sidebar}
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="btn-primary w-full mt-6"

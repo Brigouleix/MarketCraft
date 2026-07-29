@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { productsAPI, ordersAPI, boutiquesAPI, dashboardAPI, uploadAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useCategories } from '../hooks/useCategories';
+import AnalyseConcurrence from '../components/AnalyseConcurrence';
 import toast from 'react-hot-toast';
 
 const TABS = [
@@ -14,6 +16,9 @@ const TABS = [
   { key: 'products',  label: 'Mes produits',   icon: Package    },
   { key: 'orders',    label: 'Mes commandes',  icon: ShoppingBag},
   { key: 'boutique',  label: 'Ma boutique',    icon: Store      },
+  // Ajout hors perimetre du cahier des charges, assume comme tel :
+  // le module IA impose est la recommandation personnalisee.
+  { key: 'concurrence', label: 'Analyse concurrence', icon: TrendingUp },
 ];
 
 const STATUS_CONFIG = {
@@ -127,10 +132,21 @@ function MultiImageUploader({ value = [], onChange }) {
     try {
       const fileArr = Array.from(files).slice(0, 5 - value.length);
       const { data } = await uploadAPI.images(fileArr);
-      onChange([...value, ...data.urls]);
-      toast.success(`${data.urls.length} image(s) uploadée(s) !`);
-    } catch {
-      toast.error("Erreur d'upload.");
+      const urls = data.urls || [];
+
+      onChange([...value, ...urls]);
+
+      // Succès partiel : certaines images sont passées, d'autres non.
+      if (data.rejets?.length) {
+        toast.error(`${data.rejets.length} image(s) refusée(s) : ${data.rejets[0].motif}`, { duration: 6000 });
+      }
+      if (urls.length) {
+        toast.success(`${urls.length} image(s) uploadée(s) !`);
+      }
+    } catch (err) {
+      // Le serveur renvoie désormais le motif exact du refus.
+      const rejets = err.response?.data?.details?.rejets;
+      toast.error(rejets?.[0]?.motif || err.response?.data?.error || "Erreur d'upload.", { duration: 6000 });
     } finally {
       setUploading(false);
     }
@@ -179,21 +195,51 @@ function MultiImageUploader({ value = [], onChange }) {
 
 function ProductForm({ product, boutiqueId, onClose, onSaved }) {
   const [form, setForm] = useState({
-    nom:         product?.nom         || '',
-    prix:        product?.prix        || '',
-    stock:       product?.stock       || '',
-    categorie:   product?.categorie   || '',
-    description: product?.description || '',
-    images:      product?.images      ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images) : [],
-    boutique_id: product?.boutique_id || boutiqueId || '',
+    nom:          product?.nom          || '',
+    prix:         product?.prix         || '',
+    stock:        product?.stock        ?? '',
+    // Catégories multiples : liste issue de la liaison, ou l'ancienne catégorie unique
+    categorie_ids: product?.categories?.length
+      ? product.categories.map((c) => c.id)
+      : (product?.categorie_id ? [product.categorie_id] : []),
+    description:  product?.description  || '',
+    images:       product?.images       ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images) : [],
+    boutique_id:  product?.boutique_id  || boutiqueId || '',
   });
   const queryClient = useQueryClient();
+  const { data: categories = [] } = useCategories();
+
+  // Les catégories sont hiérarchisées (« Objet », « Matériau »). On n'affiche
+  // que les feuilles : les racines servent d'intitulés de section et ne sont
+  // pas sélectionnables, un produit ne se range pas dans « Objet » tout court.
+  const racines = categories.filter((c) => !c.parent_id);
+  const groupes = racines
+    .map((r) => ({ racine: r, enfants: categories.filter((c) => c.parent_id === r.id) }))
+    .filter((g) => g.enfants.length > 0);
+
+  // Repli : hiérarchie absente en base, on liste tout à plat comme avant.
+  const groupesAffiches = groupes.length > 0
+    ? groupes
+    : [{ racine: null, enfants: categories }];
 
   const up = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const toggleCategorie = (id) =>
+    setForm((f) => ({
+      ...f,
+      categorie_ids: f.categorie_ids.includes(id)
+        ? f.categorie_ids.filter((c) => c !== id)
+        : [...f.categorie_ids, id],
+    }));
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
-      const payload = { ...form, prix: parseFloat(form.prix), stock: parseInt(form.stock) };
+      const payload = {
+        ...form,
+        prix: parseFloat(form.prix),
+        stock: parseInt(form.stock),
+        categorie_ids: form.categorie_ids.map((id) => parseInt(id, 10)),
+      };
       return product?.id ? productsAPI.update(product.id, payload) : productsAPI.create(payload);
     },
     onSuccess: () => {
@@ -206,7 +252,7 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.nom.trim() || !form.prix || !form.stock) {
+    if (!form.nom.trim() || !form.prix || form.stock === '') {
       toast.error('Remplissez tous les champs obligatoires.'); return;
     }
     mutate();
@@ -243,9 +289,39 @@ function ProductForm({ product, boutiqueId, onClose, onSaved }) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <input value={form.categorie} onChange={(e) => up('categorie')(e.target.value)}
-              className="input-field text-sm" placeholder="ceramique, bijoux…" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Catégories <span className="text-gray-400 font-normal">(plusieurs choix possibles)</span>
+            </label>
+            <div className="space-y-1 p-3 border border-secondary-300 rounded-lg bg-secondary-50 max-h-40 overflow-y-auto">
+              {groupesAffiches.map(({ racine, enfants }) => (
+                <div key={racine?.id ?? 'toutes'} className="mb-2 last:mb-0">
+                  {racine && (
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 px-1 mb-1">
+                      {racine.nom}
+                    </p>
+                  )}
+                  {enfants.map((cat) => (
+                    <label
+                      key={cat.id}
+                      className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-secondary-100"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.categorie_ids.includes(cat.id)}
+                        onChange={() => toggleCategorie(cat.id)}
+                        className="rounded text-primary focus:ring-primary"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">{cat.nom}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+            {form.categorie_ids.length > 1 && (
+              <p className="text-xs text-gray-400 mt-1">
+                La première sélectionnée sert de catégorie principale.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -274,6 +350,8 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  // Boutique fraîchement créée : on enchaîne sur le premier produit
+  const [newBoutiqueId, setNewBoutiqueId] = useState(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -288,36 +366,38 @@ export default function DashboardPage() {
     retry: 1,
   });
 
-  const { data: productsData, isLoading: productsLoading } = useQuery({
-    queryKey: ['my-products'],
+  const { data: boutiqueData } = useQuery({
+    queryKey: ['my-boutique'],
     queryFn: async () => {
-      const { data } = await productsAPI.getAll({ my: true });
-      return data.data ?? data.products ?? data;
+      const { data } = await boutiquesAPI.getMine();
+      return data.data ?? null;
     },
-    staleTime: 1000 * 60 * 2,
-    enabled: activeTab === 'products',
+    staleTime: 1000 * 60 * 5,
     retry: 1,
   });
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ['my-orders'],
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ['my-products', boutiqueData?.id],
     queryFn: async () => {
-      const { data } = await ordersAPI.getAll();
+      const { data } = await productsAPI.getAll({ boutique: boutiqueData.id, limit: 100 });
+      return data.data ?? data.products ?? data;
+    },
+    staleTime: 1000 * 60 * 2,
+    enabled: activeTab === 'products' && Boolean(boutiqueData?.id),
+    retry: 1,
+  });
+
+  // scope=ventes : les commandes CONTENANT les produits du vendeur, et non
+  // celles qu'il a lui-même passées. Sans ce paramètre, l'onglet reste vide
+  // — un vendeur n'achète pas ses propres articles.
+  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+    queryKey: ['vendor-orders'],
+    queryFn: async () => {
+      const { data } = await ordersAPI.getAll({ scope: 'ventes' });
       return data.data ?? data.orders ?? data;
     },
     staleTime: 1000 * 60 * 2,
     enabled: activeTab === 'orders',
-    retry: 1,
-  });
-
-  const { data: boutiqueData } = useQuery({
-    queryKey: ['my-boutique'],
-    queryFn: async () => {
-      const { data } = await boutiquesAPI.getAll({ my: true });
-      return data.boutique ?? data.data?.[0] ?? data[0] ?? null;
-    },
-    staleTime: 1000 * 60 * 5,
-    enabled: activeTab === 'boutique',
     retry: 1,
   });
 
@@ -326,16 +406,17 @@ export default function DashboardPage() {
   const orders   = Array.isArray(ordersData)   ? ordersData   : [];
   const boutique = boutiqueData || {};
 
-  const [boutiqueForm, setBoutiqueForm] = useState({ nom: '', description: '', image: '' });
+  const [boutiqueForm, setBoutiqueForm] = useState({ nom: '', description: '', logo_url: '', banniere_url: '' });
   const bUp = (k) => (v) => setBoutiqueForm((f) => ({ ...f, [k]: v }));
 
   // Sync boutiqueForm quand boutiqueData arrive
   React.useEffect(() => {
     if (boutiqueData) {
       setBoutiqueForm({
-        nom:         boutiqueData.nom         || '',
-        description: boutiqueData.description || '',
-        image:       boutiqueData.image        || '',
+        nom:          boutiqueData.nom          || '',
+        description:  boutiqueData.description  || '',
+        logo_url:     boutiqueData.logo_url     || '',
+        banniere_url: boutiqueData.banniere_url || '',
       });
     }
   }, [boutiqueData]);
@@ -354,7 +435,22 @@ export default function DashboardPage() {
   const saveBoutiqueMutation = useMutation({
     mutationFn: () =>
       boutique.id ? boutiquesAPI.update(boutique.id, boutiqueForm) : boutiquesAPI.create(boutiqueForm),
-    onSuccess: () => { toast.success('Boutique sauvegardée !'); queryClient.invalidateQueries(['my-boutique']); },
+    onSuccess: (res) => {
+      const isCreation = !boutique.id;
+      queryClient.invalidateQueries(['my-boutique']);
+      if (isCreation) {
+        // Une boutique sans produit n'apparaît pas dans le catalogue :
+        // on enchaîne directement sur la création du premier produit.
+        const created = res?.data?.data;
+        if (created?.id) setNewBoutiqueId(created.id);
+        setEditingProduct(null);
+        setShowProductForm(true);
+        setActiveTab('products');
+        toast.success('Boutique créée ! Ajoutez votre premier produit pour la rendre visible dans le catalogue.', { duration: 6000 });
+      } else {
+        toast.success('Boutique sauvegardée !');
+      }
+    },
     onError:   () => toast.error('Erreur de sauvegarde.'),
   });
 
@@ -450,7 +546,17 @@ export default function DashboardPage() {
       )}
 
       {/* ── Products ─────────────────────────────────────────────────────── */}
-      {activeTab === 'products' && (
+      {activeTab === 'products' && !boutique?.id && !newBoutiqueId ? (
+        <div className="card p-12 text-center">
+          <Store size={40} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-500 mb-4">
+            Crée d'abord ta boutique pour pouvoir ajouter des produits.
+          </p>
+          <button onClick={() => setActiveTab('boutique')} className="btn-primary">
+            Créer ma boutique
+          </button>
+        </div>
+      ) : activeTab === 'products' && (
         <div>
           <div className="flex justify-between items-center mb-5">
             <h2 className="font-serif font-bold text-xl text-gray-800">Mes produits</h2>
@@ -507,7 +613,11 @@ export default function DashboardPage() {
                             <span className="font-medium text-gray-800">{product.nom}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 capitalize">{product.categorie_nom || product.categorie || '–'}</td>
+                        <td className="px-4 py-3 text-gray-600 capitalize">
+                          {product.categories?.length
+                            ? product.categories.map((c) => c.nom).join(', ')
+                            : (product.categorie_nom || product.categorie || '–')}
+                        </td>
                         <td className="px-4 py-3 font-semibold text-primary">{Number(product.prix).toFixed(2)} €</td>
                         <td className="px-4 py-3">
                           <span className={`font-medium ${product.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
@@ -537,7 +647,7 @@ export default function DashboardPage() {
           {showProductForm && (
             <ProductForm
               product={editingProduct}
-              boutiqueId={boutique?.id}
+              boutiqueId={boutique?.id || newBoutiqueId}
               onClose={() => setShowProductForm(false)}
               onSaved={() => setShowProductForm(false)}
             />
@@ -616,7 +726,10 @@ export default function DashboardPage() {
                 placeholder="Décrivez votre boutique, votre savoir-faire…" />
             </div>
 
-            <ImageUploader value={boutiqueForm.image} onChange={bUp('image')} label="Logo / image de la boutique" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <ImageUploader value={boutiqueForm.logo_url} onChange={bUp('logo_url')} label="Logo de la boutique" />
+              <ImageUploader value={boutiqueForm.banniere_url} onChange={bUp('banniere_url')} label="Bannière de la boutique" />
+            </div>
 
             <button onClick={() => saveBoutiqueMutation.mutate()}
               disabled={saveBoutiqueMutation.isPending || !boutiqueForm.nom.trim()}
@@ -624,6 +737,24 @@ export default function DashboardPage() {
               {saveBoutiqueMutation.isPending ? 'Sauvegarde…' : 'Enregistrer les modifications'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Onglet : analyse concurrentielle ─────────────────────────────
+          Les chiffres viennent du serveur ; le modele de langage ne redige
+          que la synthese et les conseils. Monte uniquement a l'ouverture de
+          l'onglet, pour ne pas declencher un appel au fournisseur IA a
+          chaque visite du tableau de bord. */}
+      {activeTab === 'concurrence' && (
+        <div>
+          <h2 className="font-serif font-bold text-xl text-gray-800 mb-1">
+            Analyse concurrentielle
+          </h2>
+          <p className="text-sm text-gray-500 mb-5">
+            Comment vos produits se situent face aux autres artisans de la plateforme.
+          </p>
+
+          <AnalyseConcurrence />
         </div>
       )}
     </div>

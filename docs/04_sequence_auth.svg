@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900" font-family="Segoe UI, Arial, sans-serif">
+
+  <defs>
+    <!-- Flèche pleine : appel synchrone -->
+    <marker id="arrowFull" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
+      <path d="M1,1 L11,5 L1,9 Z" fill="#000"/>
+    </marker>
+    <!-- Flèche ouverte : message de retour -->
+    <marker id="arrowRet" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
+      <path d="M1,1 L10,5 L1,9" fill="none" stroke="#000" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="900" fill="#ffffff"/>
+
+  <text x="500" y="24" text-anchor="middle" font-size="15" font-weight="bold" fill="#000">
+    Diagramme de séquence — Authentification JWT (MarketCraft)
+  </text>
+
+  <!-- ══════════════ LIGNES DE VIE (pointillés) ══════════════ -->
+  <g stroke="#999" stroke-width="1" stroke-dasharray="5 4">
+    <line x1="90"  y1="118" x2="90"  y2="865"/>
+    <line x1="330" y1="87"  x2="330" y2="865"/>
+    <line x1="620" y1="87"  x2="620" y2="865"/>
+    <line x1="880" y1="87"  x2="880" y2="865"/>
+  </g>
+
+  <!-- ══════════════ BARRES D'ACTIVATION ══════════════ -->
+  <g fill="#e8f6f6" stroke="#00b3b3" stroke-width="1">
+    <rect x="326" y="130" width="8" height="430"/>
+    <rect x="616" y="170" width="8" height="352"/>
+    <rect x="876" y="200" width="8" height="35"/>
+    <rect x="326" y="685" width="8" height="135"/>
+    <rect x="616" y="690" width="8" height="75"/>
+  </g>
+
+  <!-- ══════════════ TÊTES DE LIGNES DE VIE ══════════════ -->
+  <!-- Acteur Utilisateur -->
+  <g stroke="#000" stroke-width="1.5" fill="none">
+    <circle cx="90" cy="52" r="9" fill="#fff"/>
+    <line x1="90" y1="61" x2="90" y2="88"/>
+    <line x1="76" y1="69" x2="104" y2="69"/>
+    <line x1="90" y1="88" x2="79" y2="106"/>
+    <line x1="90" y1="88" x2="101" y2="106"/>
+  </g>
+  <text x="90" y="117" text-anchor="middle" font-size="12">Utilisateur</text>
+
+  <g fill="#ccffff" stroke="#00b3b3" stroke-width="1.2">
+    <rect x="248" y="55" width="164" height="32"/>
+    <rect x="522" y="55" width="196" height="32"/>
+    <rect x="812" y="55" width="136" height="32"/>
+  </g>
+  <g font-size="12" text-anchor="middle" fill="#000">
+    <text x="330" y="75">: Frontend React</text>
+    <text x="620" y="75">: API (AuthController)</text>
+    <text x="880" y="75">: BDD MySQL</text>
+  </g>
+
+  <!-- ══════════════ MESSAGES : CONNEXION ══════════════ -->
+  <g stroke="#000" stroke-width="1.1" fill="none">
+    <line x1="90" y1="135" x2="324" y2="135" marker-end="url(#arrowFull)"/>
+    <line x1="334" y1="170" x2="614" y2="170" marker-end="url(#arrowFull)"/>
+    <line x1="624" y1="200" x2="874" y2="200" marker-end="url(#arrowFull)"/>
+    <line x1="876" y1="230" x2="626" y2="230" stroke-dasharray="6 4" marker-end="url(#arrowRet)"/>
+    <!-- auto-message : password_verify -->
+    <polyline points="624,255 684,255 684,275 628,275" marker-end="url(#arrowFull)"/>
+  </g>
+  <g font-size="11" fill="#000" text-anchor="middle">
+    <text x="207" y="129">saisit email + mot de passe</text>
+    <text x="474" y="164">POST /api/auth/login {email, password}</text>
+    <text x="749" y="194">SELECT * FROM utilisateurs WHERE email = ?</text>
+    <text x="751" y="224">ligne utilisateur | vide</text>
+  </g>
+  <text x="694" y="269" font-size="11" fill="#000">password_verify(password, password_hash)</text>
+
+  <!-- ══════════════ FRAGMENT ALT ══════════════ -->
+  <rect x="50" y="300" width="910" height="300" fill="none" stroke="#000" stroke-width="1.2"/>
+  <path d="M50,300 L100,300 L100,312 L90,322 L50,322 Z" fill="#eee" stroke="#000" stroke-width="1"/>
+  <text x="62" y="316" font-size="11.5" font-weight="bold">alt</text>
+  <text x="400" y="316" font-size="11" font-style="italic" text-anchor="middle">[identifiants valides]</text>
+  <line x1="50" y1="470" x2="960" y2="470" stroke="#000" stroke-width="1" stroke-dasharray="7 4"/>
+  <text x="112" y="488" font-size="11" font-style="italic">[sinon]</text>
+
+  <g stroke="#000" stroke-width="1.1" fill="none">
+    <!-- auto-message : signature JWT -->
+    <polyline points="624,335 684,335 684,355 628,355" marker-end="url(#arrowFull)"/>
+    <!-- 200 OK -->
+    <line x1="616" y1="390" x2="336" y2="390" stroke-dasharray="6 4" marker-end="url(#arrowRet)"/>
+    <!-- auto-message : stockage tokens -->
+    <polyline points="334,405 394,405 394,425 338,425" marker-end="url(#arrowFull)"/>
+    <!-- redirection -->
+    <line x1="326" y1="450" x2="92" y2="450" stroke-dasharray="6 4" marker-end="url(#arrowRet)"/>
+    <!-- 401 -->
+    <line x1="616" y1="515" x2="336" y2="515" stroke-dasharray="6 4" marker-end="url(#arrowRet)"/>
+    <!-- affichage erreur -->
+    <line x1="326" y1="550" x2="92" y2="550" stroke-dasharray="6 4" marker-end="url(#arrowRet)"/>
+  </g>
+  <text x="694" y="349" font-size="11" fill="#000">signe JWT access (24 h) + refresh (7 j)</text>
+  <g font-size="11" fill="#000" text-anchor="middle">
+    <text x="476" y="384">200 OK {access_token, refresh_token, user}</text>
+    <text x="209" y="444">redirection (session ouverte)</text>
+    <text x="476" y="509">401 « Invalid email or password » (message générique)</text>
+    <text x="209" y="544">affiche « Identifiants invalides »</text>
+  </g>
+  <text x="402" y="419" font-size="11" fill="#000">stocke les tokens (localStorage)</text>
+
+  <!-- ══════════════ FRAGMENT OPT : REFRESH ══════════════ -->
+  <rect x="50" y="640" width="910" height="200" fill="none" stroke="#000" stroke-width="1.2"/>
+  <path d="M50,640 L100,640 L100,652 L90,662 L50,662 Z" fill="#eee" stroke="#000" stroke-width="1"/>
+  <text x="60" y="656" font-size="11.5" font-weight="bold">opt</text>
+  <text x="400" y="656" font-size="11" font-style="italic" text-anchor="middle">[access token expiré — intercepteur axios sur réponse 401]</text>
+
+  <g stroke="#000" stroke-width="1.1" fill="none">
+    <line x1="334" y1="690" x2="614" y2="690" marker-end="url(#arrowFull)"/>
+    <!-- auto-message : vérif refresh -->
+    <polyline points="624,705 684,705 684,725 628,725" marker-end="url(#arrowFull)"/>
+    <line x1="616" y1="760" x2="336" y2="760" stroke-dasharray="6 4" marker-end="url(#arrowRet)"/>
+    <!-- auto-message : rejeu requête -->
+    <polyline points="334,780 394,780 394,800 338,800" marker-end="url(#arrowFull)"/>
+  </g>
+  <g font-size="11" fill="#000" text-anchor="middle">
+    <text x="474" y="684">POST /api/auth/refresh {refresh_token}</text>
+    <text x="476" y="754">200 OK {access_token, refresh_token}</text>
+  </g>
+  <text x="694" y="719" font-size="11" fill="#000">décode et vérifie le refresh JWT, re-signe les tokens</text>
+  <text x="402" y="794" font-size="11" fill="#000">rejoue la requête initiale avec le nouveau token</text>
+</svg>

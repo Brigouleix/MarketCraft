@@ -15,8 +15,10 @@ use App\Controllers\ProductController;
 use App\Controllers\BoutiqueController;
 use App\Controllers\OrderController;
 use App\Controllers\AvisController;
+use App\Controllers\CategorieController;
 use App\Controllers\DashboardController;
 use App\Controllers\UploadController;
+use App\Controllers\AdminController;
 
 // =========================================================================
 // AUTH
@@ -39,6 +41,9 @@ $router->get('/auth/me', [AuthController::class, 'me'], ['auth']);
 
 // PUT  /auth/me        – Mise à jour du profil
 $router->put('/auth/me', [AuthController::class, 'updateMe'], ['auth']);
+
+// DELETE /auth/me      – Suppression (désactivation) du compte
+$router->delete('/auth/me', [AuthController::class, 'deleteMe'], ['auth']);
 
 // =========================================================================
 // PRODUITS
@@ -65,6 +70,10 @@ $router->delete('/products/:id', [ProductController::class, 'destroy'], ['auth']
 
 // GET    /boutiques        – Liste des boutiques actives
 $router->get('/boutiques', [BoutiqueController::class, 'index']);
+
+// GET    /boutiques/me     – Boutique du vendeur connecté (JWT)
+// Doit être déclarée AVANT /boutiques/:id, sinon "me" est capturé comme :id.
+$router->get('/boutiques/me', [BoutiqueController::class, 'me'], ['auth']);
 
 // GET    /boutiques/:id    – Détail avec produits
 $router->get('/boutiques/:id', [BoutiqueController::class, 'show']);
@@ -111,6 +120,13 @@ $router->post('/products/:id/avis', [AvisController::class, 'store'], ['auth']);
 $router->delete('/avis/:id', [AvisController::class, 'destroy'], ['auth']);
 
 // =========================================================================
+// CATEGORIES
+// =========================================================================
+
+// GET /categories – Liste des catégories (public)
+$router->get('/categories', [CategorieController::class, 'index']);
+
+// =========================================================================
 // RECHERCHE
 // =========================================================================
 
@@ -141,6 +157,43 @@ $router->post('/upload/image', [UploadController::class, 'image'], ['auth']);
 
 // POST /upload/images  – Upload multiple (JWT)
 $router->post('/upload/images', [UploadController::class, 'images'], ['auth']);
+
+// =========================================================================
+// ADMINISTRATION (JWT + rôle admin vérifié dans le contrôleur)
+// =========================================================================
+
+// GET    /admin/stats                – Statistiques globales
+$router->get('/admin/stats', [AdminController::class, 'stats'], ['auth']);
+
+// GET    /admin/users                – Liste des utilisateurs
+$router->get('/admin/users', [AdminController::class, 'users'], ['auth']);
+
+// PUT    /admin/users/:id/toggle     – Activer / désactiver un compte
+$router->put('/admin/users/:id/toggle', [AdminController::class, 'toggleUser'], ['auth']);
+
+// GET    /admin/boutiques            – Liste des boutiques
+$router->get('/admin/boutiques', [AdminController::class, 'boutiques'], ['auth']);
+
+// PUT    /admin/boutiques/:id/toggle – Activer / suspendre une boutique
+$router->put('/admin/boutiques/:id/toggle', [AdminController::class, 'toggleBoutique'], ['auth']);
+
+// GET    /admin/avis                 – Liste des avis (modération)
+$router->get('/admin/avis', [AdminController::class, 'avis'], ['auth']);
+
+// DELETE /admin/avis/:id             – Supprimer un avis
+$router->delete('/admin/avis/:id', [AdminController::class, 'deleteAvis'], ['auth']);
+
+// GET    /admin/categories           – Liste des catégories (+ nb produits)
+$router->get('/admin/categories', [AdminController::class, 'categories'], ['auth']);
+
+// POST   /admin/categories           – Créer une catégorie
+$router->post('/admin/categories', [AdminController::class, 'createCategorie'], ['auth']);
+
+// PUT    /admin/categories/:id       – Modifier une catégorie
+$router->put('/admin/categories/:id', [AdminController::class, 'updateCategorie'], ['auth']);
+
+// DELETE /admin/categories/:id       – Supprimer (force=1 pour confirmer)
+$router->delete('/admin/categories/:id', [AdminController::class, 'deleteCategorie'], ['auth']);
 
 // =========================================================================
 // ROUTE DE SANTÉ

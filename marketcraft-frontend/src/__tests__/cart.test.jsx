@@ -46,7 +46,8 @@ describe('CartPage', () => {
   it('affiche les articles du panier', () => {
     renderCart([{ ...mockProduct, quantity: 2 }]);
     expect(screen.getByText('Bol en noyer ciré')).toBeInTheDocument();
-    expect(screen.getByText(/90/)).toBeInTheDocument(); // 45 * 2
+    // 45 × 2 = 90, affiché plusieurs fois (ligne article, sous-total, total)
+    expect(screen.getAllByText(/90/).length).toBeGreaterThan(0);
   });
 
   it('appelle removeItem au clic sur supprimer', () => {

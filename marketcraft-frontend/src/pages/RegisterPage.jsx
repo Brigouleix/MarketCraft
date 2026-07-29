@@ -14,6 +14,7 @@ export default function RegisterPage() {
     password: '',
     password_confirmation: '',
     role: 'acheteur',
+    accepteConditions: false,
   });
   const [errors, setErrors] = useState({});
   const [showPwd, setShowPwd] = useState(false);
@@ -29,6 +30,9 @@ export default function RegisterPage() {
     if (!/[0-9]/.test(form.password)) errs.password = 'Au moins un chiffre requis.';
     if (form.password !== form.password_confirmation)
       errs.password_confirmation = 'Les mots de passe ne correspondent pas.';
+    if (!form.accepteConditions)
+      errs.accepteConditions =
+        "Vous devez accepter les conditions d'utilisation et la politique de confidentialité pour créer un compte.";
     return errs;
   };
 
@@ -42,7 +46,9 @@ export default function RegisterPage() {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    const result = await register(form);
+    // La case d'acceptation ne concerne pas l'API : on l'exclut du payload.
+    const { accepteConditions, ...payload } = form;
+    const result = await register(payload);
     if (result.success) {
       navigate(form.role === 'vendeur' ? '/dashboard' : '/');
     }
@@ -221,14 +227,45 @@ export default function RegisterPage() {
             </div>
 
             {/* Terms */}
-            <label className="flex items-start gap-2 cursor-pointer select-none">
-              <input type="checkbox" required className="mt-0.5 text-primary" />
-              <span className="text-xs text-gray-600">
-                En m'inscrivant, j'accepte les{' '}
-                <a href="#" className="text-primary underline">conditions d'utilisation</a> et la{' '}
-                <a href="#" className="text-primary underline">politique de confidentialité</a>.
-              </span>
-            </label>
+            <div>
+              <label htmlFor="accepteConditions" className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  id="accepteConditions"
+                  name="accepteConditions"
+                  type="checkbox"
+                  checked={form.accepteConditions}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, accepteConditions: e.target.checked }));
+                    if (errors.accepteConditions) setErrors((prev) => ({ ...prev, accepteConditions: '' }));
+                  }}
+                  className={`mt-0.5 text-primary ${errors.accepteConditions ? 'ring-2 ring-red-400 rounded' : ''}`}
+                />
+                <span className="text-xs text-gray-600">
+                  En m'inscrivant, j'accepte les{' '}
+                  <Link
+                    to="/conditions-utilisation"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline hover:text-primary-600"
+                  >
+                    conditions d'utilisation
+                  </Link>{' '}
+                  et la{' '}
+                  <Link
+                    to="/confidentialite"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline hover:text-primary-600"
+                  >
+                    politique de confidentialité
+                  </Link>
+                  . <span className="text-red-500">*</span>
+                </span>
+              </label>
+              {errors.accepteConditions && (
+                <p className="text-red-500 text-xs mt-1.5">{errors.accepteConditions}</p>
+              )}
+            </div>
 
             <button
               type="submit"

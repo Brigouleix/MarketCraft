@@ -10,3 +10,7 @@ vendor/
 *.log
 storage/logs/
 cache/
+
+# ── Fichiers uploadés par les utilisateurs (données runtime, pas du code) ──────
+public/uploads/*
+!public/uploads/.gitkeep

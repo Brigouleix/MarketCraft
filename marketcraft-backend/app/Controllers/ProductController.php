@@ -27,20 +27,37 @@ class ProductController extends Controller
     public function index(array $params = []): void
     {
         $page      = max(1, (int) ($this->getParam('page', 1)));
-        $limit     = min(100, max(1, (int) ($this->getParam('limit', 20))));
+        $limit     = min(100, max(1, (int) ($this->getParam('per_page') ?? $this->getParam('limit', 20))));
         $search    = $this->getParam('search')    ?: null;
-        $categorie = $this->getParam('categorie') ? (int) $this->getParam('categorie') : null;
-        $boutique  = $this->getParam('boutique')  ? (int) $this->getParam('boutique')  : null;
+        $categorie = $this->getParam('categorie') ?: null; // id numérique ou slug
+        $materiau  = $this->getParam('materiau')  ?: null; // idem, groupe « Matériau »
+        $boutiqueP = $this->getParam('boutique_id') ?? $this->getParam('boutique');
+        $boutique  = $boutiqueP ? (int) $boutiqueP : null;
         $prixMin   = $this->getParam('prix_min')  ? (float) $this->getParam('prix_min') : null;
         $prixMax   = $this->getParam('prix_max')  ? (float) $this->getParam('prix_max') : null;
-        $sort      = $this->getParam('sort', 'created_at');
-        $order     = strtoupper($this->getParam('order', 'DESC'));
+        $noteMin   = $this->getParam('note_min')  ? (float) $this->getParam('note_min') : null;
+
+        // Tri "métier" envoyé par le front, prioritaire sur sort/order bruts
+        $triMap = [
+            'prix_asc'  => ['prix', 'ASC'],
+            'prix_desc' => ['prix', 'DESC'],
+            'recent'    => ['created_at', 'DESC'],
+            'populaire' => ['nb_avis', 'DESC'],
+        ];
+        $tri = $this->getParam('tri');
+
+        if ($tri !== null && isset($triMap[$tri])) {
+            [$sort, $order] = $triMap[$tri];
+        } else {
+            $sort  = $this->getParam('sort', 'created_at');
+            $order = strtoupper($this->getParam('order', 'DESC'));
+        }
 
         $items = $this->productModel->findAll(
-            $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order
+            $page, $limit, $search, $categorie, $boutique, $prixMin, $prixMax, $sort, $order, $noteMin, $materiau
         );
 
-        $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax);
+        $total = $this->productModel->countAll($search, $categorie, $boutique, $prixMin, $prixMax, $noteMin, $materiau);
 
         $this->paginated($items, $total, $page, $limit);
     }
@@ -110,6 +127,8 @@ class ProductController extends Controller
             $product = $this->productModel->create([
                 'boutique_id'   => $boutiqueId,
                 'categorie_id'  => isset($body['categorie_id']) ? (int) $body['categorie_id'] : null,
+                'categorie_ids' => isset($body['categorie_ids']) && is_array($body['categorie_ids'])
+                    ? $body['categorie_ids'] : null,
                 'nom'           => $body['nom'],
                 'description'   => $body['description'] ?? null,
                 'prix'          => (float) $body['prix'],

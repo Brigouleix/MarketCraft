@@ -2,12 +2,12 @@ import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart,
-  User,
   Search,
   Menu,
   X,
   LogOut,
   LayoutDashboard,
+  ShieldCheck,
   UserCircle,
   ChevronDown,
   Hammer,
@@ -25,7 +25,7 @@ const navLinks = [
 
 export default function Navbar() {
   const { count, setIsOpen: openCart } = useContext(CartContext);
-  const { user, isAuthenticated, isVendeur, logout } = useAuth();
+  const { user, isAuthenticated, isVendeur, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -122,19 +122,24 @@ export default function Navbar() {
               <span>IA</span>
             </button>
 
-            {/* Cart */}
-            <button
-              onClick={() => openCart(true)}
-              className="relative p-2.5 text-gray-600 hover:text-primary hover:bg-secondary-100 rounded-lg transition-colors"
-              aria-label="Ouvrir le panier"
-            >
-              <ShoppingCart size={20} />
-              {count > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {count > 99 ? '99+' : count}
-                </span>
-              )}
-            </button>
+            {/* Panier — masqué pour un compte vendeur : les rôles sont
+                séparés, un artisan vend et n'achète pas. Le serveur refuse
+                de toute façon POST /orders, ce masquage n'est qu'un confort
+                d'interface. */}
+            {!isVendeur && (
+              <button
+                onClick={() => openCart(true)}
+                className="relative p-2.5 text-gray-600 hover:text-primary hover:bg-secondary-100 rounded-lg transition-colors"
+                aria-label="Ouvrir le panier"
+              >
+                <ShoppingCart size={20} />
+                {count > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {count > 99 ? '99+' : count}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* User menu (desktop) */}
             {isAuthenticated ? (
@@ -169,6 +174,15 @@ export default function Navbar() {
                         className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary-100 hover:text-primary transition-colors"
                       >
                         <LayoutDashboard size={16} /> Dashboard
+                      </Link>
+                    )}
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary-100 hover:text-primary transition-colors"
+                      >
+                        <ShieldCheck size={16} /> Administration
                       </Link>
                     )}
                     <hr className="my-1 border-secondary-200" />
@@ -255,6 +269,15 @@ export default function Navbar() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-secondary-100"
                 >
                   <LayoutDashboard size={16} /> Dashboard
+                </Link>
+              )}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-secondary-100"
+                >
+                  <ShieldCheck size={16} /> Administration
                 </Link>
               )}
               <button

@@ -85,6 +85,30 @@ class Order
     }
 
     // ------------------------------------------------------------------
+    // Achat vérifié
+    // ------------------------------------------------------------------
+
+    /**
+     * Indique si l'utilisateur a commandé ce produit (commande non annulée).
+     * Sert de condition à la publication d'un avis.
+     */
+    public function userHasPurchasedProduct(int $utilisateurId, int $produitId): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT 1
+             FROM commandes c
+             JOIN lignes_commande l ON l.commande_id = c.id
+             WHERE c.utilisateur_id = :uid
+               AND l.produit_id = :pid
+               AND c.statut != 'annulee'
+             LIMIT 1"
+        );
+        $stmt->execute([':uid' => $utilisateurId, ':pid' => $produitId]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
+    // ------------------------------------------------------------------
     // Recherche
     // ------------------------------------------------------------------
 

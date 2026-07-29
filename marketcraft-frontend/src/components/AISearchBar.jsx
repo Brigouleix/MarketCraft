@@ -1,6 +1,7 @@
 /**
  * AISearchBar.jsx
- * Modal de recherche en langage naturel propulsé par Claude (IA).
+ * Modal de recherche en langage naturel propulsé par un modèle de langage.
+ * Le fournisseur est configurable côté serveur (voir SearchController).
  * S'ouvre depuis la Navbar via la prop `isOpen` / `onClose`.
  *
  * Props :
@@ -8,10 +9,11 @@
  *   - onClose  {function}  : callback pour fermer le modal
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Sparkles, Search, ChevronRight } from 'lucide-react';
 import ProductCard from './ProductCard';
+import { searchAPI } from '../services/api';
 
 // Suggestions rapides affichées sous le textarea
 const SUGGESTIONS = [
@@ -46,22 +48,29 @@ export default function AISearchBar({ isOpen, onClose }) {
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Réinitialise l'état et ferme le modal.
+   *
+   * Enveloppée dans useCallback et déclarée avant l'effet qui l'utilise :
+   * sans cela, le gestionnaire de la touche Échap capturait la version du
+   * premier rendu et refermait le modal sur un état périmé. Les setters de
+   * useState étant stables, `onClose` est la seule dépendance.
+   */
+  const handleClose = useCallback(() => {
+    setResults(null);
+    setError(null);
+    setQuery('');
+    onClose();
+  }, [onClose]);
+
   // Fermeture avec la touche Escape
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') handleClose(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, []);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────────
-
-  /** Réinitialise l'état et ferme le modal */
-  const handleClose = () => {
-    setResults(null);
-    setError(null);
-    setQuery('');
-    onClose();
-  };
+  }, [handleClose]);
 
   /** Clic sur l'overlay sombre → ferme */
   const handleOverlayClick = (e) => {
@@ -85,23 +94,21 @@ export default function AISearchBar({ isOpen, onClose }) {
     setResults(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/search/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: trimmed }),
-      });
+      // On passe par le client axios partagé plutôt qu'un fetch en dur :
+      // l'URL de l'API vient de la configuration, et les intercepteurs
+      // (JWT, gestion du 401) s'appliquent comme partout ailleurs.
+      const { data } = await searchAPI.aiSearch(trimmed);
 
-      if (!response.ok) {
-        throw new Error(`Erreur serveur : ${response.status}`);
-      }
-
-      const data = await response.json();
-      setResults(data);
+      // L'API enveloppe toujours sa charge utile dans { success, data }.
+      // Sans ce déballage, results.ai_message et results.products sont
+      // undefined et le modal reste vide quoi que renvoie le serveur.
+      setResults(data?.data ?? data);
     } catch (err) {
+      const statut = err.response?.status;
       setError(
-        err.message?.includes('fetch')
-          ? "Impossible de joindre le serveur. Vérifiez que le backend est démarré."
-          : err.message || "Une erreur inattendue s'est produite."
+        statut
+          ? (err.response?.data?.error || `Erreur serveur : ${statut}`)
+          : "Impossible de joindre le serveur. Vérifiez que le backend est démarré."
       );
     } finally {
       setIsLoading(false);
@@ -218,7 +225,7 @@ export default function AISearchBar({ isOpen, onClose }) {
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-700">
-                  🤖 Claude analyse votre recherche
+                  🤖 L'IA analyse votre recherche
                   <LoadingDots />
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Extraction des mots-clés en cours</p>
@@ -241,14 +248,41 @@ export default function AISearchBar({ isOpen, onClose }) {
           {results && !isLoading && (
             <div className="space-y-5">
 
-              {/* Message IA (bulle de chat) */}
+              {/* Message IA (bulle de chat).
+                  La teinte et le badge distinguent une interprétation réelle
+                  du modèle d'un repli sur l'extraction de mots-clés locale :
+                  sans cela, les deux réponses sont indiscernables. */}
               {results.ai_message && (
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-sm">🤖</span>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    results.ia_active ? 'bg-green-100' : 'bg-amber-100'
+                  }`}>
+                    <span className="text-sm">{results.ia_active ? '🤖' : '🔍'}</span>
                   </div>
-                  <div className="bg-green-50 border border-green-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-green-800 flex-1">
+                  <div className={`rounded-2xl rounded-tl-sm px-4 py-3 text-sm flex-1 border ${
+                    results.ia_active
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                        results.ia_active ? 'bg-green-200 text-green-900' : 'bg-amber-200 text-amber-900'
+                      }`}>
+                        {results.ia_active ? 'IA active' : 'Mode dégradé'}
+                      </span>
+                      {!results.ia_active && (
+                        <span className="text-[11px] text-amber-700">
+                          recherche par mots-clés
+                        </span>
+                      )}
+                    </div>
                     {results.ai_message}
+                    {/* Motif d'indisponibilité, expose par l'API hors production */}
+                    {!results.ia_active && results.ia_erreur && (
+                      <p className="mt-2 text-[11px] text-amber-700 font-mono break-words">
+                        {results.ia_erreur}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -282,8 +316,8 @@ export default function AISearchBar({ isOpen, onClose }) {
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {results.products.slice(0, 8).map((product) => (
-                      <div key={product.id} onClick={handleClose}>
-                        <ProductCard product={product} />
+                      <div key={product.id} onClick={handleClose} className="cursor-pointer">
+                        <ProductCard product={product} compact />
                       </div>
                     ))}
                   </div>
@@ -325,7 +359,7 @@ export default function AISearchBar({ isOpen, onClose }) {
               <div>
                 <p className="font-medium text-gray-600">Décrivez votre recherche ci-dessus</p>
                 <p className="text-sm text-gray-400 mt-1">
-                  Claude comprend le langage naturel — soyez précis !
+                  L'IA comprend le langage naturel — soyez précis !
                 </p>
               </div>
             </div>

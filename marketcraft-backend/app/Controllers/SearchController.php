@@ -8,32 +8,55 @@ use App\Core\Controller;
 use App\Config\Database;
 
 /**
- * SearchController – Gestion de la recherche produits avec IA (API Claude Anthropic)
+ * SearchController – Recherche produits assistée par un modèle de langage.
+ *
+ * Le fournisseur est Groq, dont l'API est compatible OpenAI : l'URL et le
+ * modèle sont configurables dans le .env, ce qui permet de basculer vers un
+ * autre service compatible (Mistral, OpenRouter…) sans toucher au code.
+ *
+ * En cas d'indisponibilité — clé absente, quota atteint, réseau — la recherche
+ * bascule sur une extraction de mots-clés locale : la fonctionnalité se
+ * dégrade mais ne casse jamais.
  *
  * Routes :
- *   POST /search/ai  – Recherche intelligente via Claude
- *   GET  /search     – Recherche simple par mots-clés (fallback)
+ *   POST /search/ai  – Recherche en langage naturel
+ *   GET  /search     – Recherche simple par mots-clés
  */
 class SearchController extends Controller
 {
     // Nombre maximum de résultats retournés
     private const MAX_RESULTS = 20;
 
-    // URL de l'API Anthropic
-    private const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+    // Endpoint par défaut : Mistral, au format OpenAI (chat completions).
+    // Groq offrait le même service mais son pare-feu Cloudflare filtre
+    // certaines plages d'adresses, ce qui le rendait inutilisable ici.
+    private const DEFAULT_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
-    // Modèle Claude à utiliser
-    private const CLAUDE_MODEL = 'claude-opus-4-7';
+    // Modèle par défaut. Amplement suffisant pour extraire des mots-clés.
+    // Les fournisseurs retirent régulièrement des modèles : en cas de 400,
+    // surcharger AI_MODEL dans le .env suffit, sans toucher au code.
+    private const DEFAULT_MODEL = 'mistral-small-latest';
 
-    // Nombre maximum de tokens pour la réponse Claude
+    // Nombre maximum de tokens pour la réponse du modèle
     private const MAX_TOKENS = 512;
+
+    // Fragments trahissant une valeur d'exemple laissée dans le .env.
+    // Un contrôle sur le préfixe serait plus strict, mais chaque fournisseur
+    // a le sien : autant détecter le placeholder plutôt que la forme.
+    private const KEY_PLACEHOLDERS = ['your_', 'votre_', 'xxx', '...', 'api_key_here', 'changeme'];
+
+    /**
+     * Motif du dernier échec de l'appel IA. Exposé dans la réponse HTTP
+     * uniquement en développement, pour éviter d'aller fouiller les logs.
+     */
+    private ?string $iaErreur = null;
 
     // -------------------------------------------------------------------------
     // POST /search/ai
     // -------------------------------------------------------------------------
 
     /**
-     * Recherche IA : interprète la requête en langage naturel via Claude,
+     * Recherche IA : interprète la requête en langage naturel via le modèle,
      * extrait des mots-clés et interroge la base de données produits.
      */
     public function aiSearch(array $params = []): void
@@ -52,11 +75,11 @@ class SearchController extends Controller
             return;
         }
 
-        // Tentative d'extraction IA via Claude
-        $aiResult = $this->callClaudeApi($query);
+        // Tentative d'extraction via le modèle de langage
+        $aiResult = $this->callAiApi($query);
 
         if ($aiResult !== null) {
-            // Succès : utiliser les mots-clés extraits par Claude
+            // Succès : utiliser les mots-clés extraits par le modèle
             $keywords  = $aiResult['keywords']  ?? [];
             $prixMin   = isset($aiResult['prix_min'])  && is_numeric($aiResult['prix_min'])
                 ? (float) $aiResult['prix_min']  : null;
@@ -77,6 +100,12 @@ class SearchController extends Controller
         $this->json([
             'success' => true,
             'data'    => [
+                // Permet au client de distinguer une vraie interprétation IA
+                // d'un simple repli sur les mots-clés.
+                'ia_active'  => $aiResult !== null,
+                // Diagnostic visible uniquement hors production.
+                'ia_erreur'  => (($_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production') !== 'production')
+                    ? $this->iaErreur : null,
                 'ai_message' => $aiMessage,
                 'keywords'   => $keywords,
                 'products'   => $products,
@@ -114,25 +143,62 @@ class SearchController extends Controller
         ]);
     }
 
+    /**
+     * Lit une variable d'environnement, avec un nom de repli.
+     */
+    private function env(string $cle, ?string $repli = null): string
+    {
+        foreach (array_filter([$cle, $repli]) as $nom) {
+            $valeur = trim((string) ($_ENV[$nom] ?? getenv($nom) ?: ''));
+            if ($valeur !== '') {
+                return $valeur;
+            }
+        }
+
+        return '';
+    }
+
     // -------------------------------------------------------------------------
-    // Appel à l'API Claude (Anthropic)
+    // Appel au modèle de langage (fournisseur au format OpenAI)
     // -------------------------------------------------------------------------
 
     /**
-     * Envoie la requête utilisateur à Claude et retourne le tableau JSON extrait,
-     * ou null en cas d'erreur (timeout, clé invalide, JSON malformé…).
+     * Envoie la requête utilisateur au modèle et retourne le tableau JSON
+     * extrait, ou null en cas d'échec (clé absente, quota, réseau, JSON
+     * malformé…). Le motif est alors disponible dans $this->iaErreur.
      *
      * @param string $userQuery Requête en langage naturel de l'utilisateur
      * @return array<string, mixed>|null
      */
-    private function callClaudeApi(string $userQuery): ?array
+    private function callAiApi(string $userQuery): ?array
     {
-        // Récupération de la clé API depuis les variables d'environnement
-        $apiKey = $_ENV['ANTHROPIC_API_KEY'] ?? getenv('ANTHROPIC_API_KEY') ?: '';
+        // Variables génériques AI_*, avec repli sur les anciennes GROQ_*
+        // pour ne pas casser les .env déjà en place.
+        $apiKey = $this->env('AI_API_KEY', 'GROQ_API_KEY');
+        $apiUrl = $this->env('AI_API_URL', 'GROQ_API_URL') ?: self::DEFAULT_API_URL;
+        $model  = $this->env('AI_MODEL',   'GROQ_MODEL')   ?: self::DEFAULT_MODEL;
 
         if ($apiKey === '') {
-            // Pas de clé configurée : on passe directement au fallback
+            $this->iaErreur = 'AI_API_KEY absente du .env (ou serveur PHP non redémarré).';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
+        }
+
+        // Confusion frequente : coller la cle sur la ligne AI_API_URL. On le
+        // detecte ici plutot que de laisser cURL tenter une resolution DNS.
+        if (!str_starts_with($apiUrl, 'http://') && !str_starts_with($apiUrl, 'https://')) {
+            $this->iaErreur = 'AI_API_URL n\'est pas une URL valide (« ' . substr($apiUrl, 0, 20)
+                . '… »). La clé doit être sur la ligne AI_API_KEY.';
+            error_log('[SearchController] ' . $this->iaErreur);
+            return null;
+        }
+
+        foreach (self::KEY_PLACEHOLDERS as $motif) {
+            if (stripos($apiKey, $motif) !== false) {
+                $this->iaErreur = 'AI_API_KEY contient encore une valeur d\'exemple.';
+                error_log('[SearchController] ' . $this->iaErreur);
+                return null;
+            }
         }
 
         // Construction du prompt système
@@ -145,30 +211,38 @@ Tu es un assistant e-commerce. Quand l'utilisateur décrit ce qu'il cherche, ext
   "prix_min": null,
   "message": "Message convivial expliquant ce que tu cherches (1 phrase max, tutoyer)"
 }
-Les keywords doivent être les termes de recherche SQL (noms de matériaux, types d'objets, etc.). Par exemple pour "j'aimerais un ensemble de couverts dorés avec une table en bois": keywords: ["couverts", "dorés", "métal", "table", "bois", "mobilier", "or"], message: "Je cherche des couverts dorés et une table en bois pour toi ! 🎨"
+Les keywords doivent être les termes de recherche SQL (noms de matériaux, types d'objets, etc.).
+
+REGLE IMPORTANTE : 6 mots-clés maximum, uniquement les plus discriminants. Les mots-clés sont combinés en OU dans une requête SQL : un terme trop générique ramènerait tout le catalogue. N'invente pas de variantes non demandées et n'ajoute jamais de termes vagues comme "design", "moderne", "matériau", "qualité", "artisanal".
+
+Exemple pour "j'aimerais un ensemble de couverts dorés avec une table en bois": keywords: ["couverts", "doré", "table", "bois"], message: "Je cherche des couverts dorés et une table en bois pour toi ! 🎨"
 SYSTEM;
 
-        // Corps de la requête JSON pour l'API Anthropic
+        // Corps de la requête au format OpenAI (chat completions).
+        // response_format force une sortie JSON stricte, ce qui évite d'avoir
+        // à récupérer le JSON au milieu d'un texte libre.
         $requestBody = json_encode([
-            'model'      => self::CLAUDE_MODEL,
-            'max_tokens' => self::MAX_TOKENS,
-            'system'     => $systemPrompt,
-            'messages'   => [
-                [
-                    'role'    => 'user',
-                    'content' => $userQuery,
-                ],
+            'model'           => $model,
+            'max_tokens'      => self::MAX_TOKENS,
+            'temperature'     => 0.2,
+            'response_format' => ['type' => 'json_object'],
+            'messages'        => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user',   'content' => $userQuery],
             ],
         ], JSON_UNESCAPED_UNICODE);
 
         if ($requestBody === false) {
+            $this->iaErreur = 'Encodage JSON de la requête impossible.';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
-        // Initialisation cURL
-        $ch = curl_init(self::ANTHROPIC_API_URL);
+        $ch = curl_init($apiUrl);
 
         if ($ch === false) {
+            $this->iaErreur = 'Initialisation cURL impossible.';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
@@ -177,10 +251,13 @@ SYSTEM;
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $requestBody,
             CURLOPT_TIMEOUT        => 15, // 15 secondes max
+            // Sans User-Agent explicite, cURL n'en envoie aucun et Cloudflare,
+            // qui protege l'API, rejette la requete en 403 « Access denied »
+            // avant meme de verifier la cle.
+            CURLOPT_USERAGENT      => 'MarketCraft/1.0 (+PHP cURL)',
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
-                'x-api-key: ' . $apiKey,
-                'anthropic-version: 2023-06-01',
+                'Authorization: Bearer ' . $apiKey,
             ],
         ]);
 
@@ -191,40 +268,70 @@ SYSTEM;
 
         // Vérification des erreurs réseau
         if ($response === false || $curlError !== '') {
+            // Sous XAMPP/Windows, php.ini ne définit souvent pas curl.cainfo :
+            // toute requête HTTPS échoue alors sur la vérification du certificat.
+            $this->iaErreur = str_contains($curlError, 'certificate') || str_contains($curlError, 'SSL')
+                ? "cURL ne peut pas vérifier le certificat TLS ({$curlError}). Renseignez curl.cainfo dans php.ini."
+                : "Appel réseau vers le fournisseur IA échoué : {$curlError}";
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
         // Vérification du code HTTP
         if ($httpCode < 200 || $httpCode >= 300) {
+            // Le corps de la réponse contient le motif exact du refus
+            // (clé invalide, modèle inconnu, quota dépassé…).
+            // 429 = quota du palier gratuit atteint, cas le plus courant.
+            $this->iaErreur = match (true) {
+                $httpCode === 429 => 'Quota du palier gratuit atteint (429). Réessayez dans une minute.',
+                $httpCode === 401 => 'Clé API refusée (401). Vérifiez AI_API_KEY.',
+                $httpCode === 403 => 'Requête bloquée en amont (403). Cloudflare rejette les appels sans User-Agent, ou votre IP est filtrée.',
+                default => "Le fournisseur IA a répondu {$httpCode} pour le modèle « {$model} » : "
+                    . substr((string) $response, 0, 300),
+            };
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
-        // Décodage de la réponse Anthropic
         $apiResponse = json_decode((string) $response, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->iaErreur = 'Réponse du fournisseur IA illisible : ' . json_last_error_msg();
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
-        // Extraction du texte généré par Claude
-        $content = $apiResponse['content'][0]['text'] ?? null;
+        // Format OpenAI : le texte généré se trouve dans choices[0].message.content
+        $content = $apiResponse['choices'][0]['message']['content'] ?? null;
 
         if ($content === null || !is_string($content)) {
+            $this->iaErreur = 'Réponse du fournisseur IA sans contenu exploitable.';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
-        // Nettoyage : on extrait le bloc JSON même si Claude ajoute du texte autour
+        // Filet de sécurité si le modèle encadre le JSON de texte libre
         $content = $this->extractJsonFromText($content);
 
-        // Décodage du JSON retourné par Claude
+        // Décodage du JSON retourné par le modèle
         $decoded = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            $this->iaErreur = 'Le modèle n\'a pas renvoyé de JSON exploitable : ' . substr($content, 0, 200);
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
+        }
+
+        // Garde-fou : quelle que soit la consigne, le modèle reste libre de
+        // sur-générer. Les mots-clés étant combinés en OU, on plafonne.
+        if (isset($decoded['keywords']) && is_array($decoded['keywords'])) {
+            $decoded['keywords'] = array_slice(array_values($decoded['keywords']), 0, 6);
         }
 
         // Validation minimale : doit contenir un tableau keywords
         if (!isset($decoded['keywords']) || !is_array($decoded['keywords'])) {
+            $this->iaErreur = 'JSON reçu sans tableau « keywords ».';
+            error_log('[SearchController] ' . $this->iaErreur);
             return null;
         }
 
@@ -380,7 +487,7 @@ SYSTEM;
      * Tente d'extraire un bloc JSON valide depuis un texte qui pourrait
      * contenir du texte additionnel autour (backticks, phrases introductives…).
      *
-     * @param string $text Texte brut retourné par Claude
+     * @param string $text Texte brut retourné par le modèle
      * @return string JSON extrait ou texte original
      */
     private function extractJsonFromText(string $text): string

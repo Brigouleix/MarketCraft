@@ -1,8 +1,9 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { MapPin, CheckCircle, ShoppingBag, ArrowLeft } from 'lucide-react';
+import { MapPin, CheckCircle, ShoppingBag, ArrowLeft, CreditCard, Lock } from 'lucide-react';
 import { CartContext } from '../contexts/CartContext';
+import { useAuth } from '../hooks/useAuth';
 import { ordersAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -22,6 +23,20 @@ const INITIAL_FORM = {
   pays: 'France',
 };
 
+// Paiement simulé : carte de test pré-remplie (aucun débit réel)
+const INITIAL_PAYMENT = {
+  methode: 'carte',
+  numero: '4242 4242 4242 4242',
+  expiration: '12/29',
+  cvc: '123',
+};
+
+const PAYMENT_METHODS = [
+  { value: 'carte', label: 'Carte bancaire' },
+  { value: 'paypal', label: 'PayPal' },
+  { value: 'virement', label: 'Virement' },
+];
+
 function InputField({ label, id, error, required, ...props }) {
   return (
     <div>
@@ -36,10 +51,56 @@ function InputField({ label, id, error, required, ...props }) {
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useContext(CartContext);
+  const { user } = useAuth();
   const [form, setForm] = useState(INITIAL_FORM);
+
+  // Pré-remplit les informations déjà connues du compte (prénom, nom, email)
+  // sans écraser ce que l'utilisateur aurait déjà saisi.
+  useEffect(() => {
+    if (!user) return;
+    setForm((prev) => ({
+      ...prev,
+      prenom: prev.prenom || user.prenom || '',
+      nom: prev.nom || user.nom || '',
+      email: prev.email || user.email || '',
+    }));
+  }, [user]);
+
+  // Réutilise l'adresse de la dernière commande : le compte ne stocke pas
+  // d'adresse, mais la plus récente commande en porte une. On ne remplit que
+  // les champs encore vides, pour ne pas écraser une saisie en cours.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      try {
+        const res = await ordersAPI.getAll();
+        const commandes = res.data?.data ?? res.data ?? [];
+        const derniere = [...commandes]
+          .sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0))
+          .find((c) => c.addr_ligne1);
+        if (!derniere || annule) return;
+        setForm((prev) => ({
+          ...prev,
+          adresse: prev.adresse || derniere.addr_ligne1 || '',
+          complement: prev.complement || derniere.addr_ligne2 || '',
+          ville: prev.ville || derniere.addr_ville || '',
+          code_postal: prev.code_postal || derniere.addr_code_postal || '',
+          // `pays` a une valeur par défaut : on ne la remplace que si elle
+          // n'a pas été modifiée par l'utilisateur.
+          pays: prev.pays === 'France' ? (derniere.addr_pays || prev.pays) : prev.pays,
+        }));
+      } catch {
+        // Silencieux : si les commandes ne chargent pas, les champs restent vides.
+      }
+    })();
+    return () => { annule = true; };
+  }, [user]);
+  const [payment, setPayment] = useState(INITIAL_PAYMENT);
   const [errors, setErrors] = useState({});
   const [confirmed, setConfirmed] = useState(false);
   const [orderId, setOrderId] = useState(null);
+  const [transactionId, setTransactionId] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
   const shippingFree = total >= SHIPPING_THRESHOLD;
   const shipping = shippingFree ? 0 : SHIPPING_COST;
@@ -54,36 +115,57 @@ export default function CheckoutPage() {
     if (!form.ville.trim()) errs.ville = 'Ville requise.';
     if (!/^\d{4,6}$/.test(form.code_postal.trim())) errs.code_postal = 'Code postal invalide.';
     if (!form.pays.trim()) errs.pays = 'Pays requis.';
+    if (payment.methode === 'carte') {
+      if (!/^\d{16}$/.test(payment.numero.replace(/\s/g, ''))) errs.numero = 'Numéro de carte invalide (16 chiffres).';
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(payment.expiration.trim())) errs.expiration = 'Format MM/AA.';
+      if (!/^\d{3}$/.test(payment.cvc.trim())) errs.cvc = 'CVC : 3 chiffres.';
+    }
     return errs;
   };
 
   const { mutate, isPending } = useMutation({
     mutationFn: () =>
       ordersAPI.create({
-        adresse_livraison: form,
-        articles: items.map((i) => ({ produit_id: i.id, quantite: i.quantity, prix_unitaire: i.prix })),
-        total: grandTotal,
+        lignes: items.map((i) => ({ produit_id: i.id, quantite: i.quantity })),
+        adresse_livraison: {
+          nom_complet: `${form.prenom} ${form.nom}`.trim(),
+          ligne1: form.adresse,
+          ligne2: form.complement || null,
+          ville: form.ville,
+          code_postal: form.code_postal,
+          pays: form.pays,
+        },
+        frais_livraison: shipping,
+        paiement: {
+          methode: payment.methode,
+          detail:
+            payment.methode === 'carte'
+              ? `carte •••• ${payment.numero.replace(/\D/g, '').slice(-4)}`
+              : payment.methode,
+        },
       }),
     onSuccess: (res) => {
-      setOrderId(res.data?.order?.id || res.data?.id || Math.floor(Math.random() * 90000) + 10000);
+      const order = res.data?.data;
+      setOrderId(order?.id ?? null);
+      setTransactionId(order?.paiement?.transaction_id ?? null);
       clearCart();
       setConfirmed(true);
     },
     onError: (err) => {
-      // In demo mode, simulate success
-      if (err.code === 'ERR_NETWORK' || err.response?.status >= 500) {
-        setOrderId(Math.floor(Math.random() * 90000) + 10000);
-        clearCart();
-        setConfirmed(true);
-        return;
-      }
-      toast.error(err.response?.data?.message || 'Erreur lors de la commande. Réessayez.');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Erreur lors de la commande. Réessayez.');
     },
+    onSettled: () => setProcessing(false),
   });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const handlePaymentChange = (e) => {
+    const { name, value } = e.target;
+    setPayment((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
@@ -94,7 +176,9 @@ export default function CheckoutPage() {
       setErrors(errs);
       return;
     }
-    mutate();
+    // Simulation du traitement bancaire avant l'appel API
+    setProcessing(true);
+    setTimeout(() => mutate(), 1200);
   };
 
   // Confirmation screen
@@ -110,7 +194,14 @@ export default function CheckoutPage() {
           </h1>
           <p className="text-gray-600 leading-relaxed">
             Merci pour votre commande. Votre numéro de commande est{' '}
-            <strong className="text-primary">#{orderId}</strong>.<br />
+            <strong className="text-primary">#{orderId}</strong>.
+            {transactionId && (
+              <>
+                <br />
+                Paiement accepté — transaction <strong className="font-mono text-sm">{transactionId}</strong>.
+              </>
+            )}
+            <br />
             Un email de confirmation a été envoyé à <strong>{form.email}</strong>.
           </p>
         </div>
@@ -218,19 +309,73 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* Paiement (simulé) */}
+          <div className="card p-6">
+            <h2 className="flex items-center gap-2 font-serif font-bold text-lg text-gray-800 mb-2">
+              <CreditCard size={18} className="text-primary" /> Paiement
+            </h2>
+            <p className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-5">
+              <Lock size={12} /> Paiement simulé pour la démonstration — aucun débit réel. Une carte de test est pré-remplie.
+            </p>
+
+            {/* Méthode */}
+            <div className="flex gap-3 mb-5">
+              {PAYMENT_METHODS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPayment((p) => ({ ...p, methode: value }))}
+                  className={`flex-1 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-colors ${
+                    payment.methode === value
+                      ? 'border-primary bg-primary-50 text-primary'
+                      : 'border-secondary-300 text-gray-600 hover:border-secondary-400'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {payment.methode === 'carte' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <InputField
+                    label="Numéro de carte" id="numero" name="numero" type="text"
+                    value={payment.numero} onChange={handlePaymentChange} error={errors.numero}
+                    placeholder="4242 4242 4242 4242" required autoComplete="off" inputMode="numeric"
+                  />
+                </div>
+                <InputField
+                  label="Expiration (MM/AA)" id="expiration" name="expiration" type="text"
+                  value={payment.expiration} onChange={handlePaymentChange} error={errors.expiration}
+                  placeholder="12/29" required autoComplete="off"
+                />
+                <InputField
+                  label="CVC" id="cvc" name="cvc" type="text"
+                  value={payment.cvc} onChange={handlePaymentChange} error={errors.cvc}
+                  placeholder="123" required autoComplete="off" inputMode="numeric"
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Vous serez « redirigé » vers {payment.methode === 'paypal' ? 'PayPal' : 'votre banque'} — étape simulée dans cette version.
+              </p>
+            )}
+          </div>
+
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || processing}
             className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-base"
           >
-            {isPending ? (
+            {isPending || processing ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Traitement en cours…
+                {processing && !isPending ? 'Paiement en cours…' : 'Traitement en cours…'}
               </>
             ) : (
               <>
-                <CheckCircle size={18} /> Confirmer la commande – {grandTotal.toFixed(2)} €
+                <Lock size={16} /> Payer {grandTotal.toFixed(2)} €
               </>
             )}
           </button>

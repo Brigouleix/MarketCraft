@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
 import ProtectedRoute from './components/ProtectedRoute';
+import CookieConsent from './components/CookieConsent';
 
 // Lazy-load pages
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -14,10 +15,15 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const BoutiquesPage = lazy(() => import('./pages/BoutiquesPage'));
 const BoutiquePage = lazy(() => import('./pages/BoutiquePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
-const BuyerStatsPage = lazy(() => import('./pages/BuyerStatsPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
+const LegalNoticePage = lazy(() => import('./pages/LegalNoticePage'));
+const TermsOfUsePage = lazy(() => import('./pages/TermsOfUsePage'));
 
 function PageLoader() {
   return (
@@ -41,10 +47,17 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/produits" element={<ProductsPage />} />
             <Route path="/produits/:id" element={<ProductDetailPage />} />
+            <Route path="/boutiques" element={<BoutiquesPage />} />
             <Route path="/boutiques/:id" element={<BoutiquePage />} />
             <Route path="/search" element={<SearchResultsPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+
+            {/* Pages légales */}
+            <Route path="/confidentialite" element={<PrivacyPolicyPage />} />
+            <Route path="/cookies" element={<CookiePolicyPage />} />
+            <Route path="/mentions-legales" element={<LegalNoticePage />} />
+            <Route path="/conditions-utilisation" element={<TermsOfUsePage />} />
 
             {/* Protected routes */}
             <Route
@@ -80,10 +93,10 @@ export default function App() {
               }
             />
             <Route
-              path="/mes-stats"
+              path="/admin"
               element={
-                <ProtectedRoute>
-                  <BuyerStatsPage />
+                <ProtectedRoute role="admin">
+                  <AdminPage />
                 </ProtectedRoute>
               }
             />
@@ -103,6 +116,7 @@ export default function App() {
         </Suspense>
       </main>
       <Footer />
+      <CookieConsent />
     </div>
   );
 }

@@ -13,6 +13,7 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('mc_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    else delete config.headers.Authorization; // évite un token périmé hérité des defaults après logout
     return config;
   },
   (error) => Promise.reject(error)
@@ -32,7 +33,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Un 401 sur les routes d'auth (mauvais identifiants, refresh expiré…)
+    // n'est pas une session expirée : on laisse l'appelant afficher l'erreur.
+    const isAuthRoute = ['/auth/login', '/auth/register', '/auth/refresh'].some(
+      (route) => originalRequest?.url?.includes(route)
+    );
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -82,8 +89,11 @@ api.interceptors.response.use(
 export const authAPI = {
   login:        (credentials) => api.post('/auth/login', credentials),
   register:     (userData)    => api.post('/auth/register', userData),
+  // Défi captcha, exigé par le serveur au-delà de 3 échecs de connexion.
+  captcha:      ()            => api.get('/auth/captcha'),
   me:           ()            => api.get('/auth/me'),
   updateMe:     (data)        => api.put('/auth/me', data),
+  deleteMe:     (data)        => api.delete('/auth/me', { data }),
   logout:       ()            => api.post('/auth/logout'),
   refreshToken: (token)       => api.post('/auth/refresh', { refresh_token: token }),
 };
@@ -103,22 +113,34 @@ export const ordersAPI = {
   getAll: (params) => api.get('/orders', { params }),
   getById: (id) => api.get(`/orders/${id}`),
   create: (data) => api.post('/orders', data),
-  updateStatus: (id, status) => api.patch(`/orders/${id}/status`, { status }),
+  updateStatus: (id, status) => api.put(`/orders/${id}/status`, { statut: status }),
+  // Facture PDF de la commande (téléchargement binaire).
+  facture: (id) => api.get(`/orders/${id}/facture`, { responseType: 'blob' }),
 };
 
 // ── Boutiques ─────────────────────────────────────────────────────────────────
 export const boutiquesAPI = {
   getAll: (params) => api.get('/boutiques', { params }),
+  getMine: () => api.get('/boutiques/me'),
   getById: (id) => api.get(`/boutiques/${id}`),
   create: (data) => api.post('/boutiques', data),
   update: (id, data) => api.put(`/boutiques/${id}`, data),
   getProducts: (id, params) => api.get(`/boutiques/${id}/products`, { params }),
 };
 
+// ── Catégories ───────────────────────────────────────────────────────────────
+export const categoriesAPI = {
+  getAll: () => api.get('/categories'),
+};
+
 // ── Avis (Reviews) ───────────────────────────────────────────────────────────
 export const avisAPI = {
   getByProduct: (productId, params) => api.get(`/products/${productId}/avis`, { params }),
   create: (productId, data) => api.post(`/products/${productId}/avis`, data),
+  // Le droit de déposer un avis est décidé par le serveur, pas déduit côté
+  // client : la règle est ainsi appliquée au même endroit qu'elle est
+  // vérifiée à l'écriture.
+  eligibilite: (productId) => api.get(`/products/${productId}/avis/eligibilite`),
   delete: (productId, avisId) => api.delete(`/products/${productId}/avis/${avisId}`),
 };
 
@@ -140,6 +162,47 @@ export const uploadAPI = {
     files.forEach((f) => form.append('images[]', f));
     return api.post('/upload/images', form, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+};
+
+// ── Administration ───────────────────────────────────────────────────────────
+export const adminAPI = {
+  getStats:        () => api.get('/admin/stats'),
+  getUsers:        () => api.get('/admin/users'),
+  toggleUser:      (id) => api.put(`/admin/users/${id}/toggle`),
+  getBoutiques:    () => api.get('/admin/boutiques'),
+  toggleBoutique:  (id) => api.put(`/admin/boutiques/${id}/toggle`),
+  getAvis:         () => api.get('/admin/avis'),
+  deleteAvis:      (id) => api.delete(`/admin/avis/${id}`),
+
+  // Journal d'activité (paginé, filtrable par niveau)
+  getLogs:         (params) => api.get('/admin/logs', { params }),
+
+  // Catégories
+  getCategories:   () => api.get('/admin/categories'),
+  createCategorie: (payload) => api.post('/admin/categories', payload),
+  updateCategorie: (id, payload) => api.put(`/admin/categories/${id}`, payload),
+  // force=1 confirme la suppression malgré des produits rattachés
+  deleteCategorie: (id, force = false) =>
+    api.delete(`/admin/categories/${id}${force ? '?force=1' : ''}`),
+};
+
+// ── Recommandations IA ────────────────────────────────────────────────────────
+// Module « recommandation personnalisée » du cahier des charges (option C).
+// Chaque réponse porte `ia_active` : false signale un repli par similarité,
+// que l'interface affiche sous forme de badge.
+export const recommandationsAPI = {
+  // Produits similaires ou complémentaires à une fiche consultée.
+  parProduit:    (id, limit = 4) => api.get(`/products/${id}/recommendations`, { params: { limit } }),
+  // À partir du contenu du panier.
+  parPanier:     (produitIds, limit = 4) => api.post('/cart/recommendations', { produit_ids: produitIds }, { params: { limit } }),
+  // À partir de l'historique d'achat du client connecté.
+  parHistorique: (limit = 4) => api.get('/me/recommendations', { params: { limit } }),
+};
+
+// ── Analyse concurrentielle (tableau de bord vendeur) ─────────────────────────
+// Ajout hors périmètre du cahier des charges, assumé comme tel.
+export const concurrenceAPI = {
+  get: () => api.get('/dashboard/concurrence'),
 };
 
 // ── AI Search ─────────────────────────────────────────────────────────────────

@@ -2,6 +2,10 @@
 
 Description : Ce diagramme décrit en détail le mécanisme d'authentification JWT de MarketCraft, couvrant l'inscription, la connexion, la validation de token sur chaque requête protégée, et le mécanisme de refresh token pour renouveler la session sans redemander le mot de passe.
 
+> **Version UML classique** : un diagramme de séquence synthétique fidèle au code implémenté (`AuthController::login()` / `refresh()`, JWT stateless) est disponible dans [`04_sequence_auth.svg`](04_sequence_auth.svg).
+
+![Diagramme de séquence Authentification](04_sequence_auth.svg)
+
 ```mermaid
 sequenceDiagram
     actor Utilisateur

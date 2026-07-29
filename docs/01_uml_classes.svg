@@ -1,0 +1,354 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1060" font-family="Segoe UI, Arial, sans-serif">
+
+  <defs>
+    <!-- Losange plein : composition -->
+    <marker id="diamFill" markerWidth="16" markerHeight="10" refX="15" refY="5" orient="auto">
+      <path d="M1,5 L8,1 L15,5 L8,9 Z" fill="#000"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1500" height="1060" fill="#ffffff"/>
+
+  <text x="750" y="25" text-anchor="middle" font-size="15" font-weight="bold">
+    Diagramme de classes UML — MarketCraft (aligné sur la base marketcraft_3eme_dev)
+  </text>
+
+  <!-- ══════════════ RELATIONS ══════════════ -->
+  <g stroke="#000" stroke-width="1.1" fill="none">
+    <!-- Utilisateur — Boutique : possède -->
+    <line x1="320" y1="120" x2="560" y2="120"/>
+    <!-- Utilisateur ◆— AdresseLivraison : composition -->
+    <line x1="150" y1="430" x2="150" y2="310" marker-end="url(#diamFill)"/>
+    <!-- Utilisateur — Commande : passe -->
+    <line x1="320" y1="290" x2="430" y2="455"/>
+    <!-- Utilisateur — Avis : rédige (contour bas + gauche) -->
+    <polyline points="1440,760 1472,760 1472,1035 30,1035 30,150 56,150"/>
+    <!-- Boutique ◆— Produit : contient -->
+    <line x1="920" y1="380" x2="740" y2="270" marker-end="url(#diamFill)"/>
+    <!-- Produit — Categorie : catégorie principale -->
+    <line x1="1020" y1="330" x2="1240" y2="215"/>
+    <!-- Produit — Categorie : classé dans (N-N) -->
+    <line x1="1140" y1="330" x2="1370" y2="215"/>
+    <!-- Categorie — Categorie : sous-catégorie de -->
+    <polyline points="1430,100 1462,100 1462,35 1300,35 1300,58"/>
+    <!-- Commande ◆— LigneCommande : composée de -->
+    <line x1="740" y1="690" x2="620" y2="626" marker-end="url(#diamFill)"/>
+    <!-- LigneCommande — Produit : référence -->
+    <line x1="880" y1="660" x2="1020" y2="596"/>
+    <!-- Commande ◆— Paiement : réglée par -->
+    <line x1="200" y1="700" x2="480" y2="626" marker-end="url(#diamFill)"/>
+    <!-- Commande — AdresseLivraison : livrée à -->
+    <line x1="430" y1="530" x2="310" y2="530"/>
+    <!-- Produit ◆— Avis : concerne -->
+    <line x1="1300" y1="680" x2="1100" y2="596" marker-end="url(#diamFill)"/>
+  </g>
+
+  <!-- Multiplicités -->
+  <g font-size="11" fill="#000">
+    <text x="328" y="114">1</text><text x="552" y="114" text-anchor="end">0..1</text>
+    <text x="156" y="330">1</text><text x="156" y="424">0..*</text>
+    <text x="328" y="300">1</text><text x="398" y="442" text-anchor="end">0..*</text>
+    <text x="1448" y="752">0..*</text><text x="40" y="142">1</text>
+    <text x="752" y="292">1</text><text x="908" y="376" text-anchor="end">0..*</text>
+    <text x="1028" y="322">0..*</text><text x="1228" y="232" text-anchor="end">0..1</text>
+    <text x="1148" y="322">0..*</text><text x="1358" y="232" text-anchor="end">0..*</text>
+    <text x="1306" y="52">0..1</text><text x="1426" y="94" text-anchor="end">0..*</text>
+    <text x="630" y="648">1</text><text x="734" y="680" text-anchor="end">1..*</text>
+    <text x="888" y="652">0..*</text><text x="1012" y="612">1</text>
+    <text x="464" y="648">1</text><text x="208" y="692">0..1</text>
+    <text x="420" y="524" text-anchor="end">0..*</text><text x="320" y="524">0..1</text>
+    <text x="1112" y="616">1</text><text x="1290" y="672" text-anchor="end">0..*</text>
+  </g>
+
+  <!-- Noms des associations -->
+  <g font-size="10.5" font-style="italic" fill="#333">
+    <text x="430" y="112" text-anchor="middle">possède</text>
+    <text x="158" y="372">compose</text>
+    <text x="352" y="368">passe</text>
+    <text x="700" y="1028">rédige</text>
+    <text x="812" y="308">contient</text>
+    <text x="1066" y="284">catégorie principale</text>
+    <text x="1282" y="288">classé dans</text>
+    <text x="1330" y="30">sous-catégorie de</text>
+    <text x="648" y="674">composée de</text>
+    <text x="924" y="638">référence</text>
+    <text x="316" y="672">réglée par</text>
+    <text x="368" y="546" text-anchor="middle">livrée à</text>
+    <text x="1174" y="648">concerne</text>
+  </g>
+
+  <!-- ══════════════ CLASSE Utilisateur ══════════════ -->
+  <g>
+    <rect x="60" y="70" width="260" height="240" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="60" y1="88" x2="320" y2="88" stroke="#000" stroke-width="1"/>
+    <text x="190" y="83" text-anchor="middle" font-size="12" font-weight="bold">Utilisateur</text>
+    <g font-size="10.5">
+      <text x="68" y="100">- id : int</text>
+      <text x="68" y="114">- nom : string</text>
+      <text x="68" y="128">- prenom : string</text>
+      <text x="68" y="142">- email : string</text>
+      <text x="68" y="156">- passwordHash : string</text>
+      <text x="68" y="170">- role : Role</text>
+      <text x="68" y="184">- avatarUrl : string</text>
+      <text x="68" y="198">- telephone : string</text>
+      <text x="68" y="212">- estActif : boolean</text>
+      <text x="68" y="226">- createdAt : datetime</text>
+      <text x="68" y="240">- updatedAt : datetime</text>
+    </g>
+    <line x1="60" y1="246" x2="320" y2="246" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="68" y="258">+ seConnecter(email, mdp) : boolean</text>
+      <text x="68" y="272">+ mettreAJourProfil(donnees) : void</text>
+      <text x="68" y="286">+ obtenirCommandes() : List&lt;Commande&gt;</text>
+      <text x="68" y="300">+ obtenirBoutique() : Boutique</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE Boutique ══════════════ -->
+  <g>
+    <rect x="560" y="60" width="250" height="210" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="560" y1="78" x2="810" y2="78" stroke="#000" stroke-width="1"/>
+    <text x="685" y="73" text-anchor="middle" font-size="12" font-weight="bold">Boutique</text>
+    <g font-size="10.5">
+      <text x="568" y="90">- id : int</text>
+      <text x="568" y="104">- nom : string</text>
+      <text x="568" y="118">- slug : string</text>
+      <text x="568" y="132">- description : string</text>
+      <text x="568" y="146">- logoUrl : string</text>
+      <text x="568" y="160">- banniereUrl : string</text>
+      <text x="568" y="174">- estActive : boolean</text>
+      <text x="568" y="188">- noteMoyenne : decimal</text>
+      <text x="568" y="202">- createdAt : datetime</text>
+      <text x="568" y="216">- updatedAt : datetime</text>
+    </g>
+    <line x1="560" y1="222" x2="810" y2="222" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="568" y="234">+ obtenirProduits() : List&lt;Produit&gt;</text>
+      <text x="568" y="248">+ calculerNoteMoyenne() : decimal</text>
+      <text x="568" y="262">+ desactiver() : void</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE Categorie ══════════════ -->
+  <g>
+    <rect x="1180" y="60" width="250" height="155" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="1180" y1="78" x2="1430" y2="78" stroke="#000" stroke-width="1"/>
+    <text x="1305" y="73" text-anchor="middle" font-size="12" font-weight="bold">Categorie</text>
+    <g font-size="10.5">
+      <text x="1188" y="90">- id : int</text>
+      <text x="1188" y="104">- nom : string</text>
+      <text x="1188" y="118">- slug : string</text>
+      <text x="1188" y="132">- description : string</text>
+      <text x="1188" y="146">- imageUrl : string</text>
+      <text x="1188" y="160">- ordre : int</text>
+      <text x="1188" y="174">- createdAt : datetime</text>
+    </g>
+    <line x1="1180" y1="180" x2="1430" y2="180" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="1188" y="192">+ obtenirSousCategories() : List&lt;Categorie&gt;</text>
+      <text x="1188" y="206">+ obtenirProduits() : List&lt;Produit&gt;</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE Produit ══════════════ -->
+  <g>
+    <rect x="920" y="330" width="260" height="266" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="920" y1="348" x2="1180" y2="348" stroke="#000" stroke-width="1"/>
+    <text x="1050" y="343" text-anchor="middle" font-size="12" font-weight="bold">Produit</text>
+    <g font-size="10.5">
+      <text x="928" y="360">- id : int</text>
+      <text x="928" y="374">- nom : string</text>
+      <text x="928" y="388">- slug : string</text>
+      <text x="928" y="402">- description : string</text>
+      <text x="928" y="416">- prix : decimal</text>
+      <text x="928" y="430">- stock : int</text>
+      <text x="928" y="444">- noteMoyenne : decimal</text>
+      <text x="928" y="458">- nombreAvis : int</text>
+      <text x="928" y="472">- images : List&lt;string&gt;</text>
+      <text x="928" y="486">- tags : List&lt;string&gt;</text>
+      <text x="928" y="500">- estActif : boolean</text>
+      <text x="928" y="514">- estFaitMain : boolean</text>
+      <text x="928" y="528">- createdAt : datetime</text>
+      <text x="928" y="542">- updatedAt : datetime</text>
+    </g>
+    <line x1="920" y1="548" x2="1180" y2="548" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="928" y="560">+ estDisponible(qte : int) : boolean</text>
+      <text x="928" y="574">+ mettreAJourStock(qte : int) : void</text>
+      <text x="928" y="588">+ obtenirAvis() : List&lt;Avis&gt;</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE AdresseLivraison ══════════════ -->
+  <g>
+    <rect x="60" y="430" width="250" height="168" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="60" y1="448" x2="310" y2="448" stroke="#000" stroke-width="1"/>
+    <text x="185" y="443" text-anchor="middle" font-size="12" font-weight="bold">AdresseLivraison</text>
+    <g font-size="10.5">
+      <text x="68" y="460">- id : int</text>
+      <text x="68" y="474">- nomComplet : string</text>
+      <text x="68" y="488">- ligne1 : string</text>
+      <text x="68" y="502">- ligne2 : string</text>
+      <text x="68" y="516">- ville : string</text>
+      <text x="68" y="530">- codePostal : string</text>
+      <text x="68" y="544">- pays : string</text>
+      <text x="68" y="558">- estPrincipale : boolean</text>
+      <text x="68" y="572">- createdAt : datetime</text>
+    </g>
+    <line x1="60" y1="578" x2="310" y2="578" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="68" y="590">+ formater() : string</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE Commande ══════════════ -->
+  <g>
+    <rect x="430" y="430" width="250" height="196" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="430" y1="448" x2="680" y2="448" stroke="#000" stroke-width="1"/>
+    <text x="555" y="443" text-anchor="middle" font-size="12" font-weight="bold">Commande</text>
+    <g font-size="10.5">
+      <text x="438" y="460">- id : int</text>
+      <text x="438" y="474">- statut : StatutCommande</text>
+      <text x="438" y="488">- montantTotal : decimal</text>
+      <text x="438" y="502">- fraisLivraison : decimal</text>
+      <text x="438" y="516">- note : string</text>
+      <text x="438" y="530">- numeroSuivi : string</text>
+      <text x="438" y="544">- dateLivraison : datetime</text>
+      <text x="438" y="558">- createdAt : datetime</text>
+      <text x="438" y="572">- updatedAt : datetime</text>
+    </g>
+    <line x1="430" y1="578" x2="680" y2="578" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="438" y="590">+ calculerTotal() : decimal</text>
+      <text x="438" y="604">+ changerStatut(s : StatutCommande) : void</text>
+      <text x="438" y="618">+ annuler() : boolean</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE LigneCommande ══════════════ -->
+  <g>
+    <rect x="740" y="660" width="200" height="100" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="740" y1="678" x2="940" y2="678" stroke="#000" stroke-width="1"/>
+    <text x="840" y="673" text-anchor="middle" font-size="12" font-weight="bold">LigneCommande</text>
+    <g font-size="10.5">
+      <text x="748" y="690">- id : int</text>
+      <text x="748" y="704">- quantite : int</text>
+      <text x="748" y="718">- prixUnitaire : decimal</text>
+      <text x="748" y="732">- nomProduit : string</text>
+    </g>
+    <line x1="740" y1="738" x2="940" y2="738" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="748" y="750">+ calculerSousTotal() : decimal</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE Paiement ══════════════ -->
+  <g>
+    <rect x="60" y="700" width="250" height="196" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="60" y1="718" x2="310" y2="718" stroke="#000" stroke-width="1"/>
+    <text x="185" y="713" text-anchor="middle" font-size="12" font-weight="bold">Paiement</text>
+    <g font-size="10.5">
+      <text x="68" y="730">- id : int</text>
+      <text x="68" y="744">- methode : MethodePaiement</text>
+      <text x="68" y="758">- statut : StatutPaiement</text>
+      <text x="68" y="772">- montant : decimal</text>
+      <text x="68" y="786">- transactionId : string</text>
+      <text x="68" y="800">- dateLiberation : datetime</text>
+      <text x="68" y="814">- payload : json</text>
+      <text x="68" y="828">- createdAt : datetime</text>
+      <text x="68" y="842">- updatedAt : datetime</text>
+    </g>
+    <line x1="60" y1="848" x2="310" y2="848" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="68" y="860">+ valider() : boolean</text>
+      <text x="68" y="874">+ rembourser() : boolean</text>
+      <text x="68" y="888">+ liberer() : void</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ CLASSE Avis ══════════════ -->
+  <g>
+    <rect x="1220" y="680" width="220" height="125" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <line x1="1220" y1="698" x2="1440" y2="698" stroke="#000" stroke-width="1"/>
+    <text x="1330" y="693" text-anchor="middle" font-size="12" font-weight="bold">Avis</text>
+    <g font-size="10.5">
+      <text x="1228" y="710">- id : int</text>
+      <text x="1228" y="724">- note : int</text>
+      <text x="1228" y="738">- titre : string</text>
+      <text x="1228" y="752">- commentaire : string</text>
+      <text x="1228" y="766">- estVerifie : boolean</text>
+      <text x="1228" y="780">- createdAt : datetime</text>
+    </g>
+    <line x1="1220" y1="786" x2="1440" y2="786" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="1228" y="798">+ verifier() : void</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ ÉNUMÉRATIONS ══════════════ -->
+  <g>
+    <rect x="430" y="880" width="150" height="80" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <text x="505" y="893" text-anchor="middle" font-size="10" font-style="italic">«enumeration»</text>
+    <text x="505" y="906" text-anchor="middle" font-size="12" font-weight="bold">Role</text>
+    <line x1="430" y1="912" x2="580" y2="912" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="440" y="924">CLIENT</text>
+      <text x="440" y="938">VENDEUR</text>
+      <text x="440" y="952">ADMIN</text>
+    </g>
+  </g>
+
+  <g>
+    <rect x="600" y="880" width="180" height="125" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <text x="690" y="893" text-anchor="middle" font-size="10" font-style="italic">«enumeration»</text>
+    <text x="690" y="906" text-anchor="middle" font-size="12" font-weight="bold">StatutCommande</text>
+    <line x1="600" y1="912" x2="780" y2="912" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="610" y="924">EN_ATTENTE</text>
+      <text x="610" y="938">CONFIRMEE</text>
+      <text x="610" y="952">EN_PREPARATION</text>
+      <text x="610" y="966">EXPEDIEE</text>
+      <text x="610" y="980">LIVREE</text>
+      <text x="610" y="994">ANNULEE</text>
+    </g>
+  </g>
+
+  <g>
+    <rect x="800" y="880" width="160" height="110" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <text x="880" y="893" text-anchor="middle" font-size="10" font-style="italic">«enumeration»</text>
+    <text x="880" y="906" text-anchor="middle" font-size="12" font-weight="bold">StatutPaiement</text>
+    <line x1="800" y1="912" x2="960" y2="912" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="810" y="924">EN_ATTENTE</text>
+      <text x="810" y="938">VALIDE</text>
+      <text x="810" y="952">REFUSE</text>
+      <text x="810" y="966">REMBOURSE</text>
+      <text x="810" y="980">LIBERE</text>
+    </g>
+  </g>
+
+  <g>
+    <rect x="980" y="880" width="170" height="95" fill="#fff" stroke="#000" stroke-width="1.2"/>
+    <text x="1065" y="893" text-anchor="middle" font-size="10" font-style="italic">«enumeration»</text>
+    <text x="1065" y="906" text-anchor="middle" font-size="12" font-weight="bold">MethodePaiement</text>
+    <line x1="980" y1="912" x2="1150" y2="912" stroke="#000" stroke-width="1"/>
+    <g font-size="10.5">
+      <text x="990" y="924">CARTE</text>
+      <text x="990" y="938">VIREMENT</text>
+      <text x="990" y="952">PAYPAL</text>
+      <text x="990" y="966">CHEQUE</text>
+    </g>
+  </g>
+
+  <!-- ══════════════ LÉGENDE ══════════════ -->
+  <g>
+    <rect x="1220" y="860" width="240" height="120" fill="#fffef0" stroke="#b0a860" stroke-width="1"/>
+    <text x="1230" y="877" font-size="11.5" font-weight="bold">Légende</text>
+    <line x1="1230" y1="898" x2="1280" y2="898" stroke="#000" stroke-width="1.1" marker-end="url(#diamFill)"/>
+    <text x="1290" y="902" font-size="10.5">composition (le tout côté ◆)</text>
+    <line x1="1230" y1="920" x2="1280" y2="920" stroke="#000" stroke-width="1.1"/>
+    <text x="1290" y="924" font-size="10.5">association</text>
+    <text x="1230" y="946" font-size="10.5">1, 0..1, 0..*, 1..* : multiplicités</text>
+    <text x="1230" y="966" font-size="10.5">«enumeration» : type énuméré</text>
+  </g>
+</svg>

@@ -1,22 +1,24 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { colors, spacing, radius, shadow } from '../theme';
+import { colors, spacing, radius } from '../theme';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../contexts/CartContext';
+import { productsAPI } from '../services/api';
 
-const CATEGORIES = ['Tous', 'Bijoux', 'Céramique', 'Mode', 'Décoration', 'Floral', 'Art', 'Textile', 'Papeterie'];
-
-const MOCK: any[] = [
-  { id: 1, nom: 'Vase céramique fait main',    prix: 45,  note_moyenne: 4.8, nb_avis: 24, categorie: 'Céramique', boutique: { nom: 'Céramiques de Lyon' }, image: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=70' },
-  { id: 2, nom: 'Collier en argent ciselé',    prix: 89,  note_moyenne: 4.9, nb_avis: 18, categorie: 'Bijoux',    boutique: { nom: 'Bijoux Céleste'     }, image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=70' },
-  { id: 3, nom: 'Bougie parfumée cire abeille',prix: 18,  note_moyenne: 4.6, nb_avis: 41, categorie: 'Bien-être', boutique: { nom: 'Artisan du Midi'    }, image: 'https://images.unsplash.com/photo-1512572525676-f9b59951929e?w=400&q=70' },
-  { id: 4, nom: 'Écharpe laine mérinos',       prix: 65,  note_moyenne: 4.4, nb_avis: 12, categorie: 'Textile',   boutique: { nom: 'Maison Textile'     }, image: 'https://images.unsplash.com/photo-1521488741906-21a748d4d374?w=400&q=70' },
-  { id: 5, nom: 'Panier en osier tressé',      prix: 35,  note_moyenne: 4.5, nb_avis: 32, categorie: 'Décoration',boutique: { nom: 'Artisan du Midi'    }, image: 'https://images.unsplash.com/photo-1584464367415-25f25e98d8c8?w=400&q=70' },
-  { id: 6, nom: 'Carnet cuir artisanal',       prix: 28,  note_moyenne: 4.7, nb_avis: 15, categorie: 'Art',       boutique: { nom: 'Céramiques de Lyon' }, image: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=400&q=70' },
+// Catégories « objet » de la taxonomie réelle (racine « Objet »).
+const CATEGORIES: { label: string; slug: string | null }[] = [
+  { label: 'Tous',        slug: null },
+  { label: 'Bijoux',      slug: 'bijoux' },
+  { label: 'Textile',     slug: 'textile' },
+  { label: 'Déco',        slug: 'decoration-maison' },
+  { label: 'Menuiserie',  slug: 'menuiserie' },
+  { label: 'Poterie',     slug: 'poterie' },
+  { label: 'Accessoires', slug: 'accessoires' },
+  { label: 'Couture',     slug: 'couture' },
 ];
 
 const SORTS = [
@@ -26,29 +28,68 @@ const SORTS = [
   { label: 'Note',       value: 'note'      },
 ];
 
+const isUrl = (s: unknown): s is string => typeof s === 'string' && /^https?:\/\//.test(s);
+
+// Normalise un produit de l'API vers la forme attendue par ProductCard.
+function toCard(p: any) {
+  let imgs: any[] = [];
+  if (Array.isArray(p.images)) imgs = p.images;
+  else if (typeof p.images === 'string') { try { imgs = JSON.parse(p.images) || []; } catch { imgs = []; } }
+  const first = imgs[0];
+  return {
+    id: p.id,
+    nom: p.nom,
+    prix: Number(p.prix),
+    // On ne passe que des URL exploitables ; sinon ProductCard affiche son
+    // visuel de remplacement (les images de démo sont de simples noms de fichier).
+    image: isUrl(first) ? first : (isUrl(p.image) ? p.image : undefined),
+    categorie: typeof p.categorie === 'object' ? p.categorie?.nom : p.categorie,
+    note_moyenne: Number(p.note_moyenne ?? 0),
+    nb_avis: p.nb_avis ?? p.nombre_avis ?? 0,
+    boutique: p.boutique,
+  };
+}
+
 export default function CatalogScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { addItem } = useCart();
 
   const [search,   setSearch]   = useState('');
-  const [cat,      setCat]      = useState(route.params?.categorie ? CATEGORIES.find(c => c.toLowerCase() === route.params.categorie) ?? 'Tous' : 'Tous');
+  const [catSlug,  setCatSlug]  = useState<string | null>(route.params?.categorie ?? null);
   const [sort,     setSort]     = useState('populaire');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
 
-  const filtered = MOCK.filter((p) => {
-    if (search && !p.nom.toLowerCase().includes(search.toLowerCase())) return false;
-    if (cat !== 'Tous' && p.categorie !== cat) return false;
-    if (minPrice && p.prix < Number(minPrice)) return false;
-    if (maxPrice && p.prix > Number(maxPrice)) return false;
-    return true;
-  }).sort((a, b) => {
-    if (sort === 'prix_asc')  return a.prix - b.prix;
-    if (sort === 'prix_desc') return b.prix - a.prix;
-    if (sort === 'note')      return (b.note_moyenne ?? 0) - (a.note_moyenne ?? 0);
-    return (b.nb_avis ?? 0) - (a.nb_avis ?? 0);
-  });
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading,  setLoading]  = useState(true);
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = { limit: 50 };
+      if (search.trim()) params.search = search.trim();
+      if (catSlug) params.categorie = catSlug;
+      if (minPrice) params.prix_min = minPrice;
+      if (maxPrice) params.prix_max = maxPrice;
+      if (sort === 'note') { params.sort = 'note'; params.order = 'desc'; }
+      else params.tri = sort;
+
+      const res = await productsAPI.getAll(params);
+      const list = res.data?.data ?? res.data ?? [];
+      setProducts(Array.isArray(list) ? list.map(toCard) : []);
+    } catch {
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, catSlug, sort, minPrice, maxPrice]);
+
+  // Débounce léger : on ne rappelle l'API qu'après 350 ms sans frappe.
+  useEffect(() => {
+    const t = setTimeout(fetchProducts, 350);
+    return () => clearTimeout(t);
+  }, [fetchProducts]);
 
   const renderItem = useCallback(({ item }: { item: any }) => (
     <View style={styles.cardWrap}>
@@ -77,23 +118,26 @@ export default function CatalogScreen() {
       </View>
 
       {/* Category chips */}
-      <FlatList
-        data={CATEGORIES}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(c) => c}
-        contentContainerStyle={styles.catRow}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.catChip, cat === item && styles.catChipActive]}
-            onPress={() => setCat(item)}
-          >
-            <Text style={[styles.catChipText, cat === item && styles.catChipTextActive]}>
-              {item}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
+      <View style={styles.chipsWrap}>
+        <FlatList
+          data={CATEGORIES}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(c) => c.label}
+          contentContainerStyle={styles.catRow}
+          renderItem={({ item }) => {
+            const active = catSlug === item.slug;
+            return (
+              <TouchableOpacity
+                style={[styles.catChip, active && styles.catChipActive]}
+                onPress={() => setCatSlug(item.slug)}
+              >
+                <Text style={[styles.catChipText, active && styles.catChipTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
 
       {/* Sort + price filters */}
       <View style={styles.filtersRow}>
@@ -107,50 +151,43 @@ export default function CatalogScreen() {
               style={[styles.sortChip, sort === item.value && styles.sortChipActive]}
               onPress={() => setSort(item.value)}
             >
-              <Text style={[styles.sortChipText, sort === item.value && styles.sortChipTextActive]}>
-                {item.label}
-              </Text>
+              <Text style={[styles.sortChipText, sort === item.value && styles.sortChipTextActive]}>{item.label}</Text>
             </TouchableOpacity>
           )}
         />
         <View style={styles.priceRow}>
-          <TextInput
-            style={styles.priceInput}
-            placeholder="Min €"
-            keyboardType="numeric"
-            value={minPrice}
-            onChangeText={setMinPrice}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.priceInput} placeholder="Min €" keyboardType="numeric"
+            value={minPrice} onChangeText={setMinPrice} placeholderTextColor={colors.gray400} />
           <Text style={{ color: colors.gray600, fontSize: 12 }}>—</Text>
-          <TextInput
-            style={styles.priceInput}
-            placeholder="Max €"
-            keyboardType="numeric"
-            value={maxPrice}
-            onChangeText={setMaxPrice}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.priceInput} placeholder="Max €" keyboardType="numeric"
+            value={maxPrice} onChangeText={setMaxPrice} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       {/* Results */}
-      <Text style={styles.resultCount}>{filtered.length} produit{filtered.length > 1 ? 's' : ''}</Text>
-
-      <FlatList
-        data={filtered}
-        renderItem={renderItem}
-        keyExtractor={(p) => String(p.id)}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>Aucun produit trouvé</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <>
+          <Text style={styles.resultCount}>{products.length} produit{products.length > 1 ? 's' : ''}</Text>
+          <FlatList
+            data={products}
+            renderItem={renderItem}
+            keyExtractor={(p) => String(p.id)}
+            numColumns={2}
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={styles.emptyText}>Aucun produit trouvé</Text>
+              </View>
+            }
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -168,7 +205,8 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 14, marginRight: 6 },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: colors.gray800 },
 
-  catRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: 8 },
+  chipsWrap: { paddingBottom: spacing.sm },
+  catRow: { paddingHorizontal: spacing.md, gap: 8 },
   catChip: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.full,
     backgroundColor: colors.white, borderWidth: 1, borderColor: colors.secondary400,
@@ -194,6 +232,7 @@ const styles = StyleSheet.create({
   },
 
   resultCount: { paddingHorizontal: spacing.md, fontSize: 12, color: colors.gray600, marginBottom: 4 },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   list: { padding: spacing.md, paddingTop: 4 },
   row: { gap: 12, marginBottom: 12 },

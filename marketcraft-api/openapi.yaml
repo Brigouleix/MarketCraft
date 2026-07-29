@@ -1,0 +1,1236 @@
+openapi: 3.0.3
+
+info:
+  title: MarketCraft API
+  version: 2.0.0
+  description: |
+    API REST de la marketplace artisanale MarketCraft (Laravel 11 + JWT).
+
+    ## Enveloppes de réponse
+    Trois formes, et seulement trois :
+    - **succès** : `{ "success": true, "message": "OK", "data": {...} }`
+    - **succès paginé** : `{ "success": true, "data": [...], "pagination": {...} }`
+    - **erreur** : `{ "success": false, "error": "...", "details": {...} }`
+
+    ## Exceptions historiques
+    `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`,
+    `POST /upload/image` et `POST /upload/images` renvoient leurs données
+    **au premier niveau**, hors de l'enveloppe `data` (c'est ce que lit
+    l'intercepteur axios du front).
+
+    ## Authentification
+    JWT Bearer. Un jeton d'accès est obtenu via `/auth/login` ou
+    `/auth/register`, puis rafraîchi via `/auth/refresh`. Certaines routes
+    exigent un rôle (`vendeur`, `admin`).
+
+servers:
+  - url: http://localhost:8000/api
+    description: Serveur de développement local
+
+tags:
+  - name: Santé
+  - name: Authentification
+  - name: Produits
+  - name: Avis
+  - name: Recommandation IA
+  - name: Tableau de bord vendeur
+  - name: Boutiques
+  - name: Commandes
+  - name: Catégories
+  - name: Dépôt d'images
+  - name: Administration
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ================= SANTÉ =================
+  /health:
+    get:
+      tags: [Santé]
+      summary: État du service et de la base
+      security: []
+      responses:
+        '200':
+          description: Service en ligne
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  service: { type: string, example: MarketCraft API }
+                  version: { type: string, example: "2.0.0" }
+                  time: { type: string, format: date-time }
+                  database: { type: string, example: up }
+
+  # ================= AUTHENTIFICATION =================
+  /auth/register:
+    post:
+      tags: [Authentification]
+      summary: Inscription
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom, prenom, email, password]
+              properties:
+                nom: { type: string, minLength: 2, maxLength: 100 }
+                prenom: { type: string, minLength: 2, maxLength: 100 }
+                email: { type: string, format: email }
+                password:
+                  type: string
+                  description: Min. 8 caractères, majuscule et minuscule, un chiffre.
+                role:
+                  type: string
+                  enum: [client, vendeur, acheteur]
+                  description: "`acheteur` est un alias de `client`. Par défaut : client."
+                telephone: { type: string, nullable: true, maxLength: 20 }
+      responses:
+        '201':
+          description: Compte créé (jeton renvoyé hors enveloppe `data`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '409': { $ref: '#/components/responses/Conflit' }
+        '422': { $ref: '#/components/responses/ErreurValidation' }
+
+  /auth/login:
+    post:
+      tags: [Authentification]
+      summary: Connexion
+      security: []
+      description: |
+        Verrouillage après 5 échecs (15 min). Un **captcha** est exigé dès le
+        3ᵉ échec : la réponse porte alors `details.captcha_requis: true`, et il
+        faut renvoyer `captcha_token` + `captcha_reponse` (voir `/auth/captcha`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                captcha_token: { type: string, description: Jeton du défi captcha, si exigé. }
+                captcha_reponse: { type: string, description: Réponse au défi captcha, si exigé. }
+      responses:
+        '200':
+          description: Connexion réussie (jeton hors enveloppe `data`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '422':
+          description: Identifiants invalides ou captcha requis/incorrect
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+        '423':
+          description: Compte temporairement verrouillé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+
+  /auth/refresh:
+    post:
+      tags: [Authentification]
+      summary: Rafraîchir le jeton d'accès
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: Nouveau jeton (hors enveloppe `data`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+
+  /auth/captcha:
+    get:
+      tags: [Authentification]
+      summary: Générer un défi captcha
+      security: []
+      responses:
+        '200':
+          description: Défi arithmétique signé (sans état serveur)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          question: { type: string, example: "Combien font 7 + 3 ?" }
+                          token: { type: string }
+                          expire_dans: { type: integer, example: 300 }
+
+  /auth/logout:
+    post:
+      tags: [Authentification]
+      summary: Déconnexion (le client supprime son jeton)
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+
+  /auth/me:
+    get:
+      tags: [Authentification]
+      summary: Profil de l'utilisateur connecté
+      responses:
+        '200':
+          description: Profil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+    put:
+      tags: [Authentification]
+      summary: Modifier son profil (ou son mot de passe)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom: { type: string }
+                prenom: { type: string }
+                telephone: { type: string, nullable: true }
+                avatar_url: { type: string, nullable: true }
+                password: { type: string, description: Nouveau mot de passe. Exige `current_password`. }
+                current_password: { type: string }
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/User' } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '422': { $ref: '#/components/responses/ErreurValidation' }
+    delete:
+      tags: [Authentification]
+      summary: Désactiver son compte
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+
+  # ================= PRODUITS =================
+  /products:
+    get:
+      tags: [Produits]
+      summary: Liste paginée des produits (filtres)
+      security: []
+      parameters:
+        - { name: search, in: query, schema: { type: string }, description: Recherche plein texte }
+        - { name: categorie, in: query, schema: { type: string }, description: Slug de catégorie d'objet }
+        - { name: materiau, in: query, schema: { type: string }, description: Slug de catégorie de matière }
+        - { name: prix_min, in: query, schema: { type: number } }
+        - { name: prix_max, in: query, schema: { type: number } }
+        - { name: note_min, in: query, schema: { type: number } }
+        - { name: tri, in: query, schema: { type: string, enum: [recent, populaire, prix_asc, prix_desc] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 12 } }
+      responses:
+        '200':
+          description: Liste paginée
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagineEnveloppe'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Produit' } }
+    post:
+      tags: [Produits]
+      summary: Créer un produit
+      description: Réservé aux rôles `vendeur` et `admin`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom, prix, boutique_id]
+              properties:
+                nom: { type: string, minLength: 3, maxLength: 200 }
+                prix: { type: number, minimum: 0 }
+                boutique_id: { type: integer }
+                description: { type: string, nullable: true }
+                stock: { type: integer, minimum: 0 }
+                images: { type: array, items: { type: string, maxLength: 500 } }
+                tags: { type: array, items: { type: string }, nullable: true }
+                categorie_id: { type: integer, nullable: true, description: Catégorie principale (objet) }
+                categorie_ids: { type: array, items: { type: integer }, description: Objet + matière }
+                est_fait_main: { type: boolean }
+      responses:
+        '201': { $ref: '#/components/responses/RessourceProduit' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+        '422': { $ref: '#/components/responses/ErreurValidation' }
+
+  /products/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Produits]
+      summary: Détail d'un produit
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/RessourceProduit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+    put:
+      tags: [Produits]
+      summary: Modifier un produit (propriétaire)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom: { type: string }
+                prix: { type: number }
+                description: { type: string, nullable: true }
+                stock: { type: integer }
+                images: { type: array, items: { type: string } }
+                categorie_id: { type: integer, nullable: true }
+                categorie_ids: { type: array, items: { type: integer } }
+                est_actif: { type: boolean }
+                est_fait_main: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/RessourceProduit' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+    delete:
+      tags: [Produits]
+      summary: Supprimer un produit (propriétaire)
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  /products/{id}/avis:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Avis]
+      summary: Avis d'un produit
+      security: []
+      responses:
+        '200':
+          description: Liste des avis
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagineEnveloppe'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Avis' } }
+    post:
+      tags: [Avis]
+      summary: Déposer un avis
+      description: Exige une commande **livrée** contenant ce produit, un seul avis par couple (produit, utilisateur).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: { type: integer, minimum: 1, maximum: 5 }
+                titre: { type: string, nullable: true, maxLength: 150 }
+                commentaire: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Avis créé
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Avis' } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403':
+          description: Non éligible (aucune commande livrée)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+        '409':
+          description: Avis déjà déposé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+
+  /products/{id}/avis/eligibilite:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Avis]
+      summary: Peut-on déposer un avis ?
+      responses:
+        '200':
+          description: Éligibilité
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          peut_deposer: { type: boolean }
+                          motif: { type: string, nullable: true }
+                          message: { type: string }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+
+  /products/{id}/similar:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: limit, in: query, schema: { type: integer, default: 4 } }
+    get:
+      tags: [Recommandation IA]
+      summary: Produits similaires / complémentaires (option C du CDC)
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/RecommandationIA' }
+
+  /products/{id}/recommendations:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: limit, in: query, schema: { type: integer, default: 4 } }
+    get:
+      tags: [Recommandation IA]
+      summary: Recommandations à partir d'une fiche produit
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/RecommandationIA' }
+
+  # ================= RECOMMANDATION IA =================
+  /cart/recommendations:
+    post:
+      tags: [Recommandation IA]
+      summary: Recommandations à partir du panier
+      security: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 4 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                produit_ids: { type: array, items: { type: integer } }
+      responses:
+        '200': { $ref: '#/components/responses/RecommandationIA' }
+
+  /me/recommendations:
+    get:
+      tags: [Recommandation IA]
+      summary: Recommandations à partir de l'historique d'achat
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 4 } }
+      responses:
+        '200': { $ref: '#/components/responses/RecommandationIA' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+
+  # ================= TABLEAU DE BORD VENDEUR =================
+  /dashboard/concurrence:
+    get:
+      tags: [Tableau de bord vendeur]
+      summary: Analyse concurrentielle du catalogue (hors périmètre CDC)
+      description: |
+        Réservé aux rôles `vendeur` et `admin`. Tous les chiffres sont calculés
+        par le serveur ; l'IA ne rédige que la synthèse et les conseils.
+      responses:
+        '200':
+          description: Positionnement du catalogue
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ia_active: { type: boolean }
+                          synthese: { type: string, nullable: true }
+                          resume:
+                            type: object
+                            properties:
+                              moins_cher: { type: integer }
+                              dans_la_moyenne: { type: integer }
+                              plus_cher: { type: integer }
+                              sans_comparable: { type: integer }
+                          produits: { type: array, items: { type: object } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+
+  # ================= BOUTIQUES =================
+  /boutiques:
+    get:
+      tags: [Boutiques]
+      summary: Liste des boutiques
+      security: []
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagineEnveloppe'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Boutique' } }
+    post:
+      tags: [Boutiques]
+      summary: Créer sa boutique (une par vendeur)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                nom: { type: string, minLength: 3, maxLength: 150 }
+                description: { type: string, nullable: true }
+                logo_url: { type: string, nullable: true, maxLength: 500 }
+                banniere_url: { type: string, nullable: true, maxLength: 500 }
+      responses:
+        '201': { $ref: '#/components/responses/RessourceBoutique' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '409': { $ref: '#/components/responses/Conflit' }
+
+  /boutiques/me:
+    get:
+      tags: [Boutiques]
+      summary: Boutique du vendeur connecté
+      responses:
+        '200': { $ref: '#/components/responses/RessourceBoutique' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  /boutiques/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Boutiques]
+      summary: Détail d'une boutique et ses produits
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/RessourceBoutique' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+    put:
+      tags: [Boutiques]
+      summary: Modifier sa boutique (propriétaire)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom: { type: string }
+                description: { type: string, nullable: true }
+                logo_url: { type: string, nullable: true }
+                banniere_url: { type: string, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/RessourceBoutique' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+    delete:
+      tags: [Boutiques]
+      summary: Supprimer une boutique
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+
+  # ================= COMMANDES =================
+  /orders:
+    get:
+      tags: [Commandes]
+      summary: Commandes de l'utilisateur connecté
+      parameters:
+        - { name: scope, in: query, schema: { type: string, enum: [achats, ventes] }, description: "`ventes` : commandes reçues par le vendeur." }
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagineEnveloppe'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Commande' } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+    post:
+      tags: [Commandes]
+      summary: Passer une commande
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lignes]
+              properties:
+                lignes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      produit_id: { type: integer }
+                      quantite: { type: integer, minimum: 1 }
+                adresse_livraison_id: { type: integer, nullable: true }
+                adresse_livraison:
+                  type: object
+                  properties:
+                    nom_complet: { type: string }
+                    ligne1: { type: string }
+                    ligne2: { type: string, nullable: true }
+                    ville: { type: string }
+                    code_postal: { type: string }
+                    pays: { type: string }
+                frais_livraison: { type: number }
+                paiement:
+                  type: object
+                  properties:
+                    methode: { type: string, enum: [carte, paypal, virement] }
+                    detail: { type: string }
+      responses:
+        '201':
+          description: Commande créée
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Commande' } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '422': { $ref: '#/components/responses/ErreurValidation' }
+
+  /orders/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Commandes]
+      summary: Détail d'une commande
+      responses:
+        '200':
+          description: Commande
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Commande' } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+    delete:
+      tags: [Commandes]
+      summary: Annuler une commande
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  /orders/{id}/status:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Commandes]
+      summary: Mettre à jour le statut (vendeur/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [statut]
+              properties:
+                statut:
+                  type: string
+                  enum: [en_attente, confirmee, en_preparation, expediee, livree, annulee]
+      responses:
+        '200':
+          description: Statut mis à jour
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Commande' } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  # ================= AVIS =================
+  /avis/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    delete:
+      tags: [Avis]
+      summary: Supprimer un avis (auteur ou admin)
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  # ================= DÉPÔT D'IMAGES =================
+  /upload/image:
+    post:
+      tags: [Dépôt d'images]
+      summary: Déposer une image (réponse hors enveloppe `data`)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image: { type: string, format: binary }
+      responses:
+        '201':
+          description: Image déposée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  url: { type: string, description: URL absolue construite depuis APP_URL }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '422': { $ref: '#/components/responses/ErreurValidation' }
+
+  /upload/images:
+    post:
+      tags: [Dépôt d'images]
+      summary: Déposer plusieurs images (réponse hors enveloppe `data`)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images: { type: array, items: { type: string, format: binary } }
+      responses:
+        '201':
+          description: Images déposées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  urls: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+
+  # ================= CATÉGORIES =================
+  /categories:
+    get:
+      tags: [Catégories]
+      summary: Arbre des catégories (racines Objet / Matériau)
+      security: []
+      responses:
+        '200':
+          description: Catégories
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Categorie' } }
+
+  # ================= ADMINISTRATION =================
+  /admin/stats:
+    get:
+      tags: [Administration]
+      summary: Statistiques globales de la plateforme
+      responses:
+        '200':
+          description: Statistiques
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/AdminStats' } }
+        '401': { $ref: '#/components/responses/NonAutorise' }
+        '403': { $ref: '#/components/responses/Interdit' }
+
+  /admin/users:
+    get:
+      tags: [Administration]
+      summary: Liste des utilisateurs
+      responses:
+        '200':
+          description: Utilisateurs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/User' } }
+        '403': { $ref: '#/components/responses/Interdit' }
+
+  /admin/users/{id}/toggle:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Administration]
+      summary: Activer / désactiver un compte
+      description: Un compte `admin` ne peut pas être désactivé (403).
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  /admin/boutiques:
+    get:
+      tags: [Administration]
+      summary: Liste des boutiques (supervision)
+      responses:
+        '200':
+          description: Boutiques
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            nom: { type: string }
+                            vendeur_prenom: { type: string }
+                            vendeur_nom: { type: string }
+                            nb_produits: { type: integer }
+                            note_moyenne: { type: string, example: "4.50" }
+                            est_active: { type: integer, enum: [0, 1] }
+        '403': { $ref: '#/components/responses/Interdit' }
+
+  /admin/boutiques/{id}/toggle:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Administration]
+      summary: Suspendre / réactiver une boutique
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  /admin/avis:
+    get:
+      tags: [Administration]
+      summary: Liste des avis (modération)
+      responses:
+        '200':
+          description: Avis
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            note: { type: integer }
+                            titre: { type: string, nullable: true }
+                            commentaire: { type: string, nullable: true }
+                            auteur_prenom: { type: string }
+                            auteur_nom: { type: string }
+                            produit_nom: { type: string }
+        '403': { $ref: '#/components/responses/Interdit' }
+
+  /admin/avis/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    delete:
+      tags: [Administration]
+      summary: Supprimer un avis (modération)
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+
+  /admin/categories:
+    get:
+      tags: [Administration]
+      summary: Catégories (avec racines pour le rattachement)
+      responses:
+        '200':
+          description: "Forme imposée : { categories, racines }"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccesEnveloppe'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          categories:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                nom: { type: string }
+                                slug: { type: string }
+                                parent_nom: { type: string, nullable: true }
+                                nb_produits: { type: integer }
+                          racines:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                nom: { type: string }
+        '403': { $ref: '#/components/responses/Interdit' }
+    post:
+      tags: [Administration]
+      summary: Créer une catégorie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                nom: { type: string, minLength: 2, maxLength: 100 }
+                description: { type: string, nullable: true, maxLength: 1000 }
+                parent_id: { type: integer, nullable: true }
+      responses:
+        '201': { $ref: '#/components/responses/SuccesSimple' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '422': { $ref: '#/components/responses/ErreurValidation' }
+
+  /admin/categories/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Administration]
+      summary: Modifier / renommer une catégorie
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom: { type: string, minLength: 2, maxLength: 100 }
+                description: { type: string, nullable: true }
+                parent_id: { type: integer, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+        '422': { $ref: '#/components/responses/ErreurValidation' }
+    delete:
+      tags: [Administration]
+      summary: Supprimer une catégorie
+      description: |
+        Répond **409** avec `details: { principale, liaisons }` si des produits
+        y sont rattachés. Le client confirme via `?force=1` : les produits sont
+        alors détachés (non supprimés) et les sous-catégories remontent en racine.
+      parameters:
+        - { name: force, in: query, schema: { type: integer, enum: [1] }, description: Force la suppression malgré des produits rattachés. }
+      responses:
+        '200': { $ref: '#/components/responses/SuccesSimple' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '404': { $ref: '#/components/responses/NonTrouve' }
+        '409':
+          description: Catégorie rattachée à des produits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ErreurEnveloppe'
+                  - type: object
+                    properties:
+                      details:
+                        type: object
+                        properties:
+                          principale: { type: integer }
+                          liaisons: { type: integer }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccesEnveloppe:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: OK }
+    PagineEnveloppe:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        pagination:
+          type: object
+          properties:
+            total: { type: integer }
+            page: { type: integer }
+            limit: { type: integer }
+            total_pages: { type: integer }
+    ErreurEnveloppe:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error: { type: string }
+        details: { type: object, nullable: true }
+
+    AuthResponse:
+      type: object
+      description: Jeton et utilisateur au premier niveau (hors enveloppe `data`).
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string }
+        access_token: { type: string }
+        refresh_token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        prenom: { type: string }
+        nom: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [client, vendeur, admin] }
+        telephone: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+        est_actif: { type: integer, enum: [0, 1] }
+        created_at: { type: string, example: "2026-07-27 12:00:00" }
+
+    Boutique:
+      type: object
+      properties:
+        id: { type: integer }
+        vendeur_id: { type: integer }
+        nom: { type: string }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        logo_url: { type: string, nullable: true }
+        banniere_url: { type: string, nullable: true }
+        est_active: { type: integer, enum: [0, 1] }
+        note_moyenne: { type: string, example: "4.50" }
+
+    Produit:
+      type: object
+      properties:
+        id: { type: integer }
+        boutique_id: { type: integer }
+        categorie_id: { type: integer, nullable: true }
+        nom: { type: string }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        prix: { type: string, example: "45.00" }
+        stock: { type: integer }
+        images: { type: array, items: { type: string } }
+        note_moyenne: { type: string, example: "4.50" }
+        nombre_avis: { type: integer }
+        est_actif: { type: integer, enum: [0, 1] }
+        est_fait_main: { type: integer, enum: [0, 1] }
+
+    Categorie:
+      type: object
+      properties:
+        id: { type: integer }
+        parent_id: { type: integer, nullable: true }
+        nom: { type: string }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        ordre: { type: integer }
+
+    Avis:
+      type: object
+      properties:
+        id: { type: integer }
+        produit_id: { type: integer }
+        utilisateur_id: { type: integer }
+        note: { type: integer, minimum: 1, maximum: 5 }
+        titre: { type: string, nullable: true }
+        commentaire: { type: string, nullable: true }
+        est_verifie: { type: integer, enum: [0, 1] }
+        created_at: { type: string }
+
+    Commande:
+      type: object
+      properties:
+        id: { type: integer }
+        utilisateur_id: { type: integer }
+        statut:
+          type: string
+          enum: [en_attente, confirmee, en_preparation, expediee, livree, annulee]
+        montant_total: { type: string, example: "121.00" }
+        frais_livraison: { type: string, example: "4.90" }
+        addr_ligne1: { type: string, nullable: true }
+        addr_ligne2: { type: string, nullable: true }
+        addr_ville: { type: string, nullable: true }
+        addr_code_postal: { type: string, nullable: true }
+        addr_pays: { type: string, nullable: true }
+        lignes:
+          type: array
+          items:
+            type: object
+            properties:
+              produit_id: { type: integer }
+              produit_nom: { type: string }
+              quantite: { type: integer }
+              prix_unitaire: { type: string }
+        created_at: { type: string }
+
+    AdminStats:
+      type: object
+      properties:
+        nb_utilisateurs: { type: integer }
+        nb_vendeurs: { type: integer }
+        nb_clients: { type: integer }
+        nb_boutiques: { type: integer }
+        nb_produits: { type: integer }
+        nb_commandes: { type: integer }
+        nb_avis: { type: integer }
+        ca_global: { type: string, example: "343.80" }
+
+    RecommandationIA:
+      type: object
+      description: Le drapeau `ia_active` distingue une vraie recommandation d'un repli par similarité.
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            ia_active: { type: boolean }
+            products: { type: array, items: { $ref: '#/components/schemas/Produit' } }
+
+  responses:
+    SuccesSimple:
+      description: Opération réussie
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SuccesEnveloppe' }
+    RessourceProduit:
+      description: Produit
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccesEnveloppe'
+              - type: object
+                properties: { data: { $ref: '#/components/schemas/Produit' } }
+    RessourceBoutique:
+      description: Boutique
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccesEnveloppe'
+              - type: object
+                properties: { data: { $ref: '#/components/schemas/Boutique' } }
+    RecommandationIA:
+      description: Sélection de produits recommandés
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RecommandationIA' }
+    NonAutorise:
+      description: Jeton absent, invalide ou expiré
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+    Interdit:
+      description: Rôle ou droit de propriété insuffisant
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+    NonTrouve:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+    Conflit:
+      description: Conflit (ex. email déjà utilisé, boutique déjà existante)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErreurEnveloppe' }
+    ErreurValidation:
+      description: Données invalides
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErreurEnveloppe' }

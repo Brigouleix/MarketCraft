@@ -1,7 +1,13 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://localhost:8000/api';
+// L'émulateur Android atteint la machine hôte via 10.0.2.2 (et non localhost).
+// iOS / web restent sur localhost. Ajuste l'IP si tu testes sur un appareil réel.
+const BASE_URL =
+  Platform.OS === 'android'
+    ? 'http://10.0.2.2:8000/api'
+    : 'http://localhost:8000/api';
 
 const api = axios.create({ baseURL: BASE_URL });
 
