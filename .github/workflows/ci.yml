@@ -43,7 +43,7 @@ jobs:
         run: vendor/bin/phpunit --colors=never
 
   # ----------------------------------------------------------
-  # Back-end Laravel 11 : PHPUnit (49 tests / 179 assertions)
+  # Back-end Laravel 11 : PHPUnit (94 tests / 309 assertions)
   #
   # Coexiste avec le job `backend-tests` ci-dessus : les deux
   # back-ends sont maintenus en parallele jusqu'a la bascule
