@@ -48,7 +48,11 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /se connecter/i }));
 
     await waitFor(() => {
-      expect(login).toHaveBeenCalledWith('paul.martin@example.com', 'password123');
+      // Depuis l'ajout du captcha (défi exigé au-delà de 3 échecs), `login`
+      // reçoit un 3e argument : le payload du défi, `undefined` tant que le
+      // serveur ne l'a pas réclamé. Sans lui, l'assertion échoue alors que le
+      // comportement est correct.
+      expect(login).toHaveBeenCalledWith('paul.martin@example.com', 'password123', undefined);
     });
   });
 

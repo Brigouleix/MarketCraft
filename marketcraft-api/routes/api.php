@@ -15,6 +15,7 @@ use App\Http\Controllers\FactureController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RecommandationController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UploadController;
 use Illuminate\Support\Facades\Route;
 
@@ -92,6 +93,14 @@ Route::middleware('jwt')->group(function () {
     Route::get('/products/{id}/avis/eligibilite', [AvisController::class, 'eligibilite'])
         ->whereNumber('id');
 });
+
+// =========================================================================
+// RECHERCHE (langage naturel via IA, ou mots-cles simples)
+// =========================================================================
+
+// Publiques : la recherche precede la connexion dans le parcours d'achat.
+Route::post('/search/ai', [SearchController::class, 'ai']);
+Route::get('/search', [SearchController::class, 'simple']);
 
 // =========================================================================
 // RECOMMANDATION IA (option C du cahier des charges)
